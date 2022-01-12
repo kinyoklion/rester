@@ -8,3 +8,4 @@ edition = "2021"
 [dependencies]
 crossterm = { version = "0.22.1" }
 tui = { version = "0.16.0", default-features = false, features = ['crossterm'] }
+strum_macros = "0.23.1"
