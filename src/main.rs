@@ -150,6 +150,33 @@ fn ui<B: Backend>(rect: &mut Frame<B>, app: &App) {
         .constraints([Constraint::Percentage(20), Constraint::Percentage(80)].as_ref())
         .split(chunks[1]);
 
+    let response_chunks = Layout::default()
+        .direction(Direction::Vertical)
+        .constraints([Constraint::Percentage(50), Constraint::Percentage(50)].as_ref())
+        .split(horizontal_chunks[1]);
+
+    let response_headers = Block::default()
+        .borders(Borders::ALL)
+        .style(Style::default().fg(Color::White))
+        .title("Response Header")
+        .border_type(if app.mode == Mode::ResponseHeaders {
+            BorderType::Double
+        } else {
+            BorderType::Plain
+        });
+    rect.render_widget(response_headers, response_chunks[1]);
+
+    let response_body = Block::default()
+        .borders(Borders::ALL)
+        .style(Style::default().fg(Color::White))
+        .title("Response Body")
+        .border_type(if app.mode == Mode::ResponseBody {
+            BorderType::Double
+        } else {
+            BorderType::Plain
+        });
+    rect.render_widget(response_body, response_chunks[0]);
+
     let side_chunks = Layout::default()
         .direction(Direction::Vertical)
         .constraints(
@@ -168,7 +195,7 @@ fn ui<B: Backend>(rect: &mut Frame<B>, app: &App) {
         .style(Style::default().fg(Color::White))
         .block(
             Block::default()
-                .title("Params")
+                .title("Method")
                 .borders(Borders::ALL)
                 .style(Style::default().fg(Color::White))
                 .border_type(if app.mode == Mode::Method {
