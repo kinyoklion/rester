@@ -10,6 +10,7 @@ use std::ops::Deref;
 use std::str;
 use std::str::Utf8Error;
 use std::sync::{Arc, Mutex, MutexGuard};
+use std::time::Duration;
 use std::{error::Error, io};
 use strum_macros::IntoStaticStr;
 use tokio::sync::oneshot::error::RecvError;
@@ -197,19 +198,23 @@ fn run_app<B: Backend>(terminal: &mut Terminal<B>, mut app: App) -> io::Result<(
     loop {
         terminal.draw(|f| ui(f, &app))?;
 
-        if let Event::Key(key) = event::read()? {
-            match key.code {
-                KeyCode::Esc => {
-                    return Ok(());
-                    // app.messages.push(app.input.drain(..).collect());
+        if let Ok(present) = event::poll(Duration::from_millis(16)) {
+            if present {
+                if let Event::Key(key) = event::read()? {
+                    match key.code {
+                        KeyCode::Esc => {
+                            return Ok(());
+                            // app.messages.push(app.input.drain(..).collect());
+                        }
+                        KeyCode::Tab => {
+                            app.next_mode();
+                        }
+                        code => match app.mode {
+                            Mode::Url => app.handle_url_input(code),
+                            _ => {}
+                        },
+                    }
                 }
-                KeyCode::Tab => {
-                    app.next_mode();
-                }
-                code => match app.mode {
-                    Mode::Url => app.handle_url_input(code),
-                    _ => {}
-                },
             }
         }
     }
