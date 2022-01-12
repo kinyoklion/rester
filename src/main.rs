@@ -1,11 +1,20 @@
 use crate::Mode::Url;
+use crate::Response::Success;
+use bytes::Bytes;
 use crossterm::{
     event::{self, DisableMouseCapture, EnableMouseCapture, Event, KeyCode},
     execute,
     terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
 };
+use std::ops::Deref;
+use std::str;
+use std::str::Utf8Error;
+use std::sync::{Arc, Mutex, MutexGuard};
 use std::{error::Error, io};
 use strum_macros::IntoStaticStr;
+use tokio::sync::oneshot::error::RecvError;
+use tokio::sync::{mpsc, oneshot};
+use tui::widgets::Wrap;
 use tui::{
     backend::{Backend, CrosstermBackend},
     layout::{Alignment, Constraint, Direction, Layout},
@@ -15,7 +24,7 @@ use tui::{
     Frame, Terminal,
 };
 
-#[derive(Copy, Clone, PartialEq)]
+#[derive(Copy, Clone, PartialEq, Debug)]
 enum Mode {
     Url,
     Method,
@@ -25,10 +34,25 @@ enum Mode {
     ResponseBody,
 }
 
-#[derive(Copy, Clone, PartialEq, IntoStaticStr)]
+#[derive(Copy, Clone, PartialEq, IntoStaticStr, Debug)]
 enum Method {
     GET,
     POST,
+}
+
+type Responder<T> = oneshot::Sender<T>;
+
+#[derive(Debug)]
+enum Response {
+    Success(Bytes),
+    Failure,
+}
+
+#[derive(Debug)]
+struct Request {
+    method: Method,
+    url: String,
+    resp: Responder<Response>,
 }
 
 /// App holds the state of the application
@@ -36,6 +60,8 @@ struct App {
     url: String,
     mode: Mode,
     method: Method,
+    sender: mpsc::Sender<Request>,
+    response: Arc<Mutex<Option<Bytes>>>,
 }
 
 impl App {
@@ -60,6 +86,7 @@ impl App {
     fn handle_url_input(&mut self, code: KeyCode) {
         match code {
             KeyCode::Enter => {
+                self.make_request();
                 // app.messages.push(app.input.drain(..).collect());
             }
             KeyCode::Char(c) => {
@@ -71,26 +98,84 @@ impl App {
             _ => {}
         };
     }
+
+    fn make_request(&self) {
+        let sender = self.sender.clone();
+        let method = self.method;
+        let url = self.url.clone();
+        let response = self.response.clone();
+        tokio::spawn(async move {
+            let (tx, rx) = oneshot::channel();
+            sender
+                .send(Request {
+                    method,
+                    url,
+                    resp: tx,
+                })
+                .await
+                .unwrap();
+            let res = rx.await;
+            match res {
+                Ok(Response::Success(res)) => {
+                    let mut response_bytes = response.lock().unwrap();
+                    *response_bytes = Some(res);
+                }
+                _ => {}
+            };
+        });
+    }
 }
 
-impl Default for App {
-    fn default() -> App {
+impl App {
+    fn new(sender: mpsc::Sender<Request>) -> Self {
         App {
             url: String::new(),
             mode: Url,
             method: Method::GET,
+            sender,
+            response: Arc::new(Mutex::new(None)),
         }
     }
 }
 
-fn main() -> Result<(), Box<dyn std::error::Error>> {
+#[tokio::main]
+async fn main() -> Result<(), Box<dyn std::error::Error>> {
     enable_raw_mode()?;
     let mut stdout = io::stdout();
     execute!(stdout, EnterAlternateScreen, EnableMouseCapture)?;
     let backend = CrosstermBackend::new(stdout);
     let mut terminal = Terminal::new(backend)?;
 
-    let app = App::default();
+    let (sender, mut receiver) = mpsc::channel(10);
+    let app = App::new(sender.clone());
+
+    tokio::spawn(async move {
+        loop {
+            let client = reqwest::Client::new();
+            let req = receiver.recv().await;
+            // println!("Request {:?}", req);
+            match req {
+                Some(req) => {
+                    // println!("Request {:?}", req);
+                    let res = client.get(req.url).send().await;
+                    // println!("Got {:?}", res);
+                    match res {
+                        Ok(res) => {
+                            let bytes = res.bytes().await;
+                            if let Ok(bytes) = bytes {
+                                req.resp.send(Response::Success(bytes));
+                            }
+                        }
+                        Err(_) => {
+                            req.resp.send(Response::Failure);
+                        }
+                    };
+                }
+                _ => {}
+            };
+        }
+    });
+
     let res = run_app(&mut terminal, app);
 
     disable_raw_mode()?;
@@ -166,15 +251,33 @@ fn ui<B: Backend>(rect: &mut Frame<B>, app: &App) {
         });
     rect.render_widget(response_headers, response_chunks[1]);
 
-    let response_body = Block::default()
-        .borders(Borders::ALL)
+    let option = app.response.lock().unwrap();
+    let response_string = match &(*option) {
+        None => "".to_string(),
+        Some(bytes) => {
+            format!("{:?}", bytes)
+            // println!("Bytes {:?}", bytes);
+            // match str::from_utf8(bytes) {
+            //     Ok(str) => str,
+            //     Err(_) => "wtf",
+            // }
+        }
+    };
+
+    let response_body = Paragraph::new(response_string)
+        .alignment(Alignment::Left)
         .style(Style::default().fg(Color::White))
-        .title("Response Body")
-        .border_type(if app.mode == Mode::ResponseBody {
-            BorderType::Double
-        } else {
-            BorderType::Plain
-        });
+        .wrap(Wrap { trim: true })
+        .block(
+            Block::default()
+                .borders(Borders::ALL)
+                .title("Response Body")
+                .border_type(if app.mode == Mode::ResponseBody {
+                    BorderType::Double
+                } else {
+                    BorderType::Plain
+                }),
+        );
     rect.render_widget(response_body, response_chunks[0]);
 
     let side_chunks = Layout::default()
@@ -243,7 +346,7 @@ fn ui<B: Backend>(rect: &mut Frame<B>, app: &App) {
                 }),
         );
 
-    let copyright = Paragraph::new("Ryan Lamb 2020")
+    let copyright = Paragraph::new("Ryan Lamb 2022")
         .style(Style::default().fg(Color::LightCyan))
         .alignment(Alignment::Center)
         .block(
