@@ -259,14 +259,7 @@ fn ui<B: Backend>(rect: &mut Frame<B>, app: &App) {
     let option = app.response.lock().unwrap();
     let response_string = match &(*option) {
         None => "".to_string(),
-        Some(bytes) => {
-            format!("{:?}", bytes)
-            // println!("Bytes {:?}", bytes);
-            // match str::from_utf8(bytes) {
-            //     Ok(str) => str,
-            //     Err(_) => "wtf",
-            // }
-        }
+        Some(bytes) => String::from_utf8_lossy(bytes).to_string(),
     };
 
     paragraph(
