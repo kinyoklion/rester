@@ -6,6 +6,7 @@ use crossterm::{
     execute,
     terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
 };
+use rester::ui::paragraph::{paragraph, paragraph_color};
 use std::ops::Deref;
 use std::str;
 use std::str::Utf8Error;
@@ -23,8 +24,6 @@ use tui::{
     widgets::{Block, BorderType, Borders, List, ListItem, Paragraph},
     Frame, Terminal,
 };
-use rester::ui::paragraph::{paragraph, paragraph_color};
-
 
 #[derive(Copy, Clone, PartialEq, Debug)]
 enum Mode {
@@ -266,8 +265,13 @@ fn ui<B: Backend>(rect: &mut Frame<B>, app: &App) {
         }
     };
 
-    paragraph(rect, response_chunks[0], "Response Body",
-              response_string.as_str(), app.mode == Mode::ResponseBody);
+    paragraph(
+        rect,
+        response_chunks[0],
+        "Response Body",
+        response_string.as_str(),
+        app.mode == Mode::ResponseBody,
+    );
 
     let side_chunks = Layout::default()
         .direction(Direction::Vertical)
@@ -283,8 +287,13 @@ fn ui<B: Backend>(rect: &mut Frame<B>, app: &App) {
 
     let method_str: &'static str = app.method.into();
 
-    paragraph(rect, side_chunks[0], "Method",
-              method_str, app.mode == Mode::Method);
+    paragraph(
+        rect,
+        side_chunks[0],
+        "Method",
+        method_str,
+        app.mode == Mode::Method,
+    );
 
     let params = Block::default()
         .borders(Borders::ALL)
@@ -308,8 +317,14 @@ fn ui<B: Backend>(rect: &mut Frame<B>, app: &App) {
         });
     rect.render_widget(headers, side_chunks[2]);
 
-    paragraph_color(rect, chunks[0], "URL", app.url.as_ref(),
-              app.mode == Mode::Url, Color::LightCyan);
+    paragraph_color(
+        rect,
+        chunks[0],
+        "URL",
+        app.url.as_ref(),
+        app.mode == Mode::Url,
+        Color::LightCyan,
+    );
 
     let copyright = Paragraph::new("Ryan Lamb 2022")
         .style(Style::default().fg(Color::LightCyan))
