@@ -1,5 +1,5 @@
 use crate::Mode::Url;
-use crate::Response::Success;
+
 use bytes::Bytes;
 use crossterm::{
     event::{self, DisableMouseCapture, EnableMouseCapture, Event, KeyCode},
@@ -7,21 +7,20 @@ use crossterm::{
     terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
 };
 use rester::ui::paragraph::{paragraph, paragraph_color};
-use std::ops::Deref;
+
 use std::str;
-use std::str::Utf8Error;
-use std::sync::{Arc, Mutex, MutexGuard};
-use std::{error::Error, io};
+
+use std::sync::{Arc, Mutex};
+use std::{io};
 use strum_macros::IntoStaticStr;
-use tokio::sync::oneshot::error::RecvError;
+
 use tokio::sync::{mpsc, oneshot};
-use tui::widgets::Wrap;
+
 use tui::{
     backend::{Backend, CrosstermBackend},
     layout::{Alignment, Constraint, Direction, Layout},
-    style::{Color, Modifier, Style},
-    text::{Span, Spans, Text},
-    widgets::{Block, BorderType, Borders, List, ListItem, Paragraph},
+    style::{Color, Style},
+    widgets::{Block, BorderType, Borders, Paragraph},
     Frame, Terminal,
 };
 
