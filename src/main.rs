@@ -23,6 +23,8 @@ use tui::{
     widgets::{Block, BorderType, Borders, List, ListItem, Paragraph},
     Frame, Terminal,
 };
+use rester::ui::paragraph::paragraph;
+
 
 #[derive(Copy, Clone, PartialEq, Debug)]
 enum Mode {
@@ -264,21 +266,8 @@ fn ui<B: Backend>(rect: &mut Frame<B>, app: &App) {
         }
     };
 
-    let response_body = Paragraph::new(response_string)
-        .alignment(Alignment::Left)
-        .style(Style::default().fg(Color::White))
-        .wrap(Wrap { trim: true })
-        .block(
-            Block::default()
-                .borders(Borders::ALL)
-                .title("Response Body")
-                .border_type(if app.mode == Mode::ResponseBody {
-                    BorderType::Double
-                } else {
-                    BorderType::Plain
-                }),
-        );
-    rect.render_widget(response_body, response_chunks[0]);
+    paragraph(rect, response_chunks[0], "Response Body",
+              response_string.as_str(), app.mode == Mode::ResponseBody);
 
     let side_chunks = Layout::default()
         .direction(Direction::Vertical)
