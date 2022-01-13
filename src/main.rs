@@ -1,27 +1,27 @@
 use crate::Mode::Url;
-use crate::Response::Success;
+
 use bytes::Bytes;
 use crossterm::{
     event::{self, DisableMouseCapture, EnableMouseCapture, Event, KeyCode},
     execute,
     terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
 };
-use std::ops::Deref;
+use rester::ui::paragraph::{paragraph, paragraph_color};
+
 use std::str;
 use std::str::Utf8Error;
-use std::sync::{Arc, Mutex, MutexGuard};
+use std::sync::{Arc, Mutex};
 use std::time::Duration;
 use std::{error::Error, io};
 use strum_macros::IntoStaticStr;
-use tokio::sync::oneshot::error::RecvError;
+
 use tokio::sync::{mpsc, oneshot};
-use tui::widgets::Wrap;
+
 use tui::{
     backend::{Backend, CrosstermBackend},
     layout::{Alignment, Constraint, Direction, Layout},
-    style::{Color, Modifier, Style},
-    text::{Span, Spans, Text},
-    widgets::{Block, BorderType, Borders, List, ListItem, Paragraph},
+    style::{Color, Style},
+    widgets::{Block, BorderType, Borders, Paragraph},
     Frame, Terminal,
 };
 
@@ -269,21 +269,13 @@ fn ui<B: Backend>(rect: &mut Frame<B>, app: &App) {
         }
     };
 
-    let response_body = Paragraph::new(response_string)
-        .alignment(Alignment::Left)
-        .style(Style::default().fg(Color::White))
-        .wrap(Wrap { trim: true })
-        .block(
-            Block::default()
-                .borders(Borders::ALL)
-                .title("Response Body")
-                .border_type(if app.mode == Mode::ResponseBody {
-                    BorderType::Double
-                } else {
-                    BorderType::Plain
-                }),
-        );
-    rect.render_widget(response_body, response_chunks[0]);
+    paragraph(
+        rect,
+        response_chunks[0],
+        "Response Body",
+        response_string.as_str(),
+        app.mode == Mode::ResponseBody,
+    );
 
     let side_chunks = Layout::default()
         .direction(Direction::Vertical)
@@ -298,21 +290,14 @@ fn ui<B: Backend>(rect: &mut Frame<B>, app: &App) {
         .split(horizontal_chunks[0]);
 
     let method_str: &'static str = app.method.into();
-    let method = Paragraph::new(method_str)
-        .alignment(Alignment::Left)
-        .style(Style::default().fg(Color::White))
-        .block(
-            Block::default()
-                .title("Method")
-                .borders(Borders::ALL)
-                .style(Style::default().fg(Color::White))
-                .border_type(if app.mode == Mode::Method {
-                    BorderType::Double
-                } else {
-                    BorderType::Plain
-                }),
-        );
-    rect.render_widget(method, side_chunks[0]);
+
+    paragraph(
+        rect,
+        side_chunks[0],
+        "Method",
+        method_str,
+        app.mode == Mode::Method,
+    );
 
     let params = Block::default()
         .borders(Borders::ALL)
@@ -336,20 +321,14 @@ fn ui<B: Backend>(rect: &mut Frame<B>, app: &App) {
         });
     rect.render_widget(headers, side_chunks[2]);
 
-    let url = Paragraph::new(app.url.as_ref())
-        .style(Style::default().fg(Color::LightCyan))
-        .alignment(Alignment::Left)
-        .block(
-            Block::default()
-                .borders(Borders::ALL)
-                .style(Style::default().fg(Color::White))
-                .title("URL")
-                .border_type(if app.mode == Mode::Url {
-                    BorderType::Double
-                } else {
-                    BorderType::Plain
-                }),
-        );
+    paragraph_color(
+        rect,
+        chunks[0],
+        "URL",
+        app.url.as_ref(),
+        app.mode == Mode::Url,
+        Color::LightCyan,
+    );
 
     let copyright = Paragraph::new("Ryan Lamb 2022")
         .style(Style::default().fg(Color::LightCyan))
@@ -363,5 +342,4 @@ fn ui<B: Backend>(rect: &mut Frame<B>, app: &App) {
         );
 
     rect.render_widget(copyright, chunks[2]);
-    rect.render_widget(url, chunks[0]);
 }
