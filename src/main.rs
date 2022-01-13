@@ -23,7 +23,7 @@ use tui::{
     widgets::{Block, BorderType, Borders, List, ListItem, Paragraph},
     Frame, Terminal,
 };
-use rester::ui::paragraph::paragraph;
+use rester::ui::paragraph::{paragraph, paragraph_color};
 
 
 #[derive(Copy, Clone, PartialEq, Debug)]
@@ -282,21 +282,9 @@ fn ui<B: Backend>(rect: &mut Frame<B>, app: &App) {
         .split(horizontal_chunks[0]);
 
     let method_str: &'static str = app.method.into();
-    let method = Paragraph::new(method_str)
-        .alignment(Alignment::Left)
-        .style(Style::default().fg(Color::White))
-        .block(
-            Block::default()
-                .title("Method")
-                .borders(Borders::ALL)
-                .style(Style::default().fg(Color::White))
-                .border_type(if app.mode == Mode::Method {
-                    BorderType::Double
-                } else {
-                    BorderType::Plain
-                }),
-        );
-    rect.render_widget(method, side_chunks[0]);
+
+    paragraph(rect, side_chunks[0], "Method",
+              method_str, app.mode == Mode::Method);
 
     let params = Block::default()
         .borders(Borders::ALL)
@@ -320,20 +308,8 @@ fn ui<B: Backend>(rect: &mut Frame<B>, app: &App) {
         });
     rect.render_widget(headers, side_chunks[2]);
 
-    let url = Paragraph::new(app.url.as_ref())
-        .style(Style::default().fg(Color::LightCyan))
-        .alignment(Alignment::Left)
-        .block(
-            Block::default()
-                .borders(Borders::ALL)
-                .style(Style::default().fg(Color::White))
-                .title("URL")
-                .border_type(if app.mode == Mode::Url {
-                    BorderType::Double
-                } else {
-                    BorderType::Plain
-                }),
-        );
+    paragraph_color(rect, chunks[0], "URL", app.url.as_ref(),
+              app.mode == Mode::Url, Color::LightCyan);
 
     let copyright = Paragraph::new("Ryan Lamb 2022")
         .style(Style::default().fg(Color::LightCyan))
@@ -347,5 +323,4 @@ fn ui<B: Backend>(rect: &mut Frame<B>, app: &App) {
         );
 
     rect.render_widget(copyright, chunks[2]);
-    rect.render_widget(url, chunks[0]);
 }
