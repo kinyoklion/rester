@@ -50,10 +50,20 @@ enum Response {
 }
 
 #[derive(Debug)]
+enum ScrollDirection {
+    Up,
+    Down,
+}
+
+#[derive(Debug)]
 struct Request {
     method: Method,
     url: String,
     resp: Responder<Response>,
+}
+
+struct ScrollStates {
+    response: u16,
 }
 
 /// App holds the state of the application
@@ -63,6 +73,7 @@ struct App {
     method: Method,
     sender: mpsc::Sender<Request>,
     response: Arc<Mutex<Option<Bytes>>>,
+    scroll_states: ScrollStates,
 }
 
 impl App {
@@ -96,6 +107,30 @@ impl App {
             KeyCode::Backspace => {
                 self.url.pop();
             }
+            _ => {}
+        };
+    }
+
+    fn scroll(&mut self, direction: ScrollDirection) {
+        match self.mode {
+            Mode::ResponseBody => match direction {
+                ScrollDirection::Up => {
+                    if self.scroll_states.response != 0 {
+                        self.scroll_states.response -= 1;
+                    }
+                }
+                ScrollDirection::Down => {
+                    self.scroll_states.response += 1;
+                }
+            },
+            _ => {}
+        };
+    }
+
+    fn handle_response_input(&mut self, code: KeyCode) {
+        match code {
+            KeyCode::Up => self.scroll(ScrollDirection::Up),
+            KeyCode::Down => self.scroll(ScrollDirection::Down),
             _ => {}
         };
     }
@@ -135,6 +170,7 @@ impl App {
             method: Method::GET,
             sender,
             response: Arc::new(Mutex::new(None)),
+            scroll_states: ScrollStates { response: 0 },
         }
     }
 }
@@ -211,6 +247,7 @@ fn run_app<B: Backend>(terminal: &mut Terminal<B>, mut app: App) -> io::Result<(
                         }
                         code => match app.mode {
                             Mode::Url => app.handle_url_input(code),
+                            Mode::ResponseBody => app.handle_response_input(code),
                             _ => {}
                         },
                     }
@@ -268,6 +305,7 @@ fn ui<B: Backend>(rect: &mut Frame<B>, app: &App) {
         "Response Body",
         response_string.as_str(),
         app.mode == Mode::ResponseBody,
+        app.scroll_states.response,
     );
 
     let side_chunks = Layout::default()
@@ -290,6 +328,7 @@ fn ui<B: Backend>(rect: &mut Frame<B>, app: &App) {
         "Method",
         method_str,
         app.mode == Mode::Method,
+        0,
     );
 
     let params = Block::default()
@@ -320,6 +359,7 @@ fn ui<B: Backend>(rect: &mut Frame<B>, app: &App) {
         "URL",
         app.url.as_ref(),
         app.mode == Mode::Url,
+        0,
         Color::LightCyan,
     );
 

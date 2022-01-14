@@ -10,8 +10,9 @@ pub fn paragraph<B: Backend>(
     title: &str,
     text: &str,
     active: bool,
+    scroll: u16,
 ) {
-    paragraph_color(app_rect, rect, title, text, active, Color::White);
+    paragraph_color(app_rect, rect, title, text, active, scroll, Color::White);
 }
 
 pub fn paragraph_color<B: Backend>(
@@ -20,6 +21,7 @@ pub fn paragraph_color<B: Backend>(
     title: &str,
     text: &str,
     active: bool,
+    scroll: u16,
     color: Color,
 ) {
     let response_body = Paragraph::new(text)
@@ -27,6 +29,7 @@ pub fn paragraph_color<B: Backend>(
         .style(Style::default().fg(Color::LightCyan))
         .style(Style::default().fg(color))
         .wrap(Wrap { trim: true })
+        .scroll((scroll, 0))
         .block(
             Block::default()
                 .borders(Borders::ALL)
