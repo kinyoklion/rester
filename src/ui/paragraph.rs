@@ -28,7 +28,7 @@ pub fn paragraph_color<B: Backend>(
         .alignment(Alignment::Left)
         .style(Style::default().fg(Color::LightCyan))
         .style(Style::default().fg(color))
-        .wrap(Wrap { trim: true })
+        .wrap(Wrap { trim: false })
         .scroll((scroll, 0))
         .block(
             Block::default()

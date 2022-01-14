@@ -336,11 +336,19 @@ fn ui<B: Backend>(rect: &mut Frame<B>, app: &App) {
         Some(bytes) => String::from_utf8_lossy(bytes).to_string(),
     };
 
+    let pretty_json = jsonxf::pretty_print(response_string.as_str());
+
+    let final_string = if let Ok(pretty_json) = pretty_json {
+        pretty_json
+    } else {
+        response_string
+    };
+
     paragraph(
         rect,
         response_chunks[0],
         "Response Body",
-        response_string.as_str(),
+        final_string.as_str(),
         app.mode == Mode::ResponseBody,
         app.scroll_states.response,
     );
