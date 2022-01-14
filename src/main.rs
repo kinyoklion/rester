@@ -42,11 +42,12 @@ enum Method {
     POST,
 }
 
-type Responder<T> = oneshot::Sender<T>;
+type Responder<T> = mpsc::Sender<T>;
 
 #[derive(Debug)]
 enum Response {
-    Success(Bytes),
+    Headers(HeaderMap),
+    Body(Bytes),
     Failure,
 }
 
@@ -76,6 +77,7 @@ struct App {
     headers: String,
     sender: mpsc::Sender<Request>,
     response: Arc<Mutex<Option<Bytes>>>,
+    response_string: Arc<Mutex<Option<String>>>,
     scroll_states: ScrollStates,
 }
 
@@ -161,9 +163,10 @@ impl App {
         let method = self.method;
         let url = self.url.clone();
         let response = self.response.clone();
+        let res_string = self.response_string.clone();
         let headers = self.headers.clone();
         tokio::spawn(async move {
-            let (tx, rx) = oneshot::channel();
+            let (tx, mut rx) = mpsc::channel(10);
             sender
                 .send(Request {
                     method,
@@ -173,11 +176,24 @@ impl App {
                 })
                 .await
                 .unwrap();
-            let res = rx.await;
+            let res = rx.recv().await;
             match res {
-                Ok(Response::Success(res)) => {
+                Some(Response::Body(res)) => {
                     let mut response_bytes = response.lock().unwrap();
+
+                    let mut response_string = res_string.lock().unwrap();
+
+                    let decoded_string = String::from_utf8_lossy(&res);
+                    let pretty_json = jsonxf::pretty_print(decoded_string.to_string().as_str());
+
+                    let final_string = if let Ok(pretty_json) = pretty_json {
+                        pretty_json
+                    } else {
+                        decoded_string.to_string()
+                    };
+
                     *response_bytes = Some(res);
+                    *response_string = Some(final_string);
                 }
                 _ => {}
             };
@@ -194,6 +210,7 @@ impl App {
             method: Method::GET,
             sender,
             response: Arc::new(Mutex::new(None)),
+            response_string: Arc::new(Mutex::new(None)),
             scroll_states: ScrollStates { response: 0 },
         }
     }
@@ -234,13 +251,14 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                     // println!("Got {:?}", res);
                     match res {
                         Ok(res) => {
+                            req.resp.send(Response::Headers(res.headers().clone()));
                             let bytes = res.bytes().await;
                             if let Ok(bytes) = bytes {
-                                req.resp.send(Response::Success(bytes));
+                                req.resp.send(Response::Body(bytes)).await;
                             }
                         }
                         Err(_) => {
-                            req.resp.send(Response::Failure);
+                            req.resp.send(Response::Failure).await;
                         }
                     };
                 }
@@ -330,25 +348,18 @@ fn ui<B: Backend>(rect: &mut Frame<B>, app: &App) {
         });
     rect.render_widget(response_headers, response_chunks[1]);
 
-    let option = app.response.lock().unwrap();
+    let option = app.response_string.lock().unwrap();
+
     let response_string = match &(*option) {
         None => "".to_string(),
-        Some(bytes) => String::from_utf8_lossy(bytes).to_string(),
-    };
-
-    let pretty_json = jsonxf::pretty_print(response_string.as_str());
-
-    let final_string = if let Ok(pretty_json) = pretty_json {
-        pretty_json
-    } else {
-        response_string
+        Some(string) => string.clone(),
     };
 
     paragraph(
         rect,
         response_chunks[0],
         "Response Body",
-        final_string.as_str(),
+        response_string.as_str(),
         app.mode == Mode::ResponseBody,
         app.scroll_states.response,
     );
