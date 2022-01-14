@@ -8,8 +8,9 @@ use crossterm::{
 };
 use rester::ui::paragraph::{paragraph, paragraph_color};
 
+use reqwest::header::{HeaderMap, HeaderName, HeaderValue};
 use std::str;
-use std::str::Utf8Error;
+use std::str::{FromStr, Utf8Error};
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 use std::{error::Error, io};
@@ -59,6 +60,7 @@ enum ScrollDirection {
 struct Request {
     method: Method,
     url: String,
+    headers: String,
     resp: Responder<Response>,
 }
 
@@ -71,6 +73,7 @@ struct App {
     url: String,
     mode: Mode,
     method: Method,
+    headers: String,
     sender: mpsc::Sender<Request>,
     response: Arc<Mutex<Option<Bytes>>>,
     scroll_states: ScrollStates,
@@ -111,6 +114,24 @@ impl App {
         };
     }
 
+    fn handle_headers_input(&mut self, code: KeyCode) {
+        match code {
+            KeyCode::Enter => {
+                // self.make_request();
+                // app.messages.push(app.input.drain(..).collect());
+                self.headers.push('\r');
+                self.headers.push('\n');
+            }
+            KeyCode::Char(c) => {
+                self.headers.push(c);
+            }
+            KeyCode::Backspace => {
+                self.headers.pop();
+            }
+            _ => {}
+        };
+    }
+
     fn scroll(&mut self, direction: ScrollDirection) {
         match self.mode {
             Mode::ResponseBody => match direction {
@@ -140,12 +161,14 @@ impl App {
         let method = self.method;
         let url = self.url.clone();
         let response = self.response.clone();
+        let headers = self.headers.clone();
         tokio::spawn(async move {
             let (tx, rx) = oneshot::channel();
             sender
                 .send(Request {
                     method,
                     url,
+                    headers,
                     resp: tx,
                 })
                 .await
@@ -166,6 +189,7 @@ impl App {
     fn new(sender: mpsc::Sender<Request>) -> Self {
         App {
             url: String::new(),
+            headers: String::new(),
             mode: Url,
             method: Method::GET,
             sender,
@@ -194,7 +218,19 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             match req {
                 Some(req) => {
                     // println!("Request {:?}", req);
-                    let res = client.get(req.url).send().await;
+                    let mut header_map = HeaderMap::new();
+                    let headers: Vec<&str> = req.headers.split("\r\n").collect();
+
+                    for entry in headers {
+                        if let Some((key, value)) = entry.split_once(":") {
+                            if let Ok(value) = HeaderValue::from_str(value.trim()) {
+                                if let Ok(key) = HeaderName::from_str(key.trim()) {
+                                    header_map.append(key, value);
+                                }
+                            }
+                        }
+                    }
+                    let res = client.get(req.url).headers(header_map).send().await;
                     // println!("Got {:?}", res);
                     match res {
                         Ok(res) => {
@@ -247,6 +283,7 @@ fn run_app<B: Backend>(terminal: &mut Terminal<B>, mut app: App) -> io::Result<(
                         }
                         code => match app.mode {
                             Mode::Url => app.handle_url_input(code),
+                            Mode::RequestHeaders => app.handle_headers_input(code),
                             Mode::ResponseBody => app.handle_response_input(code),
                             _ => {}
                         },
@@ -342,16 +379,15 @@ fn ui<B: Backend>(rect: &mut Frame<B>, app: &App) {
         });
     rect.render_widget(params, side_chunks[1]);
 
-    let headers = Block::default()
-        .borders(Borders::ALL)
-        .style(Style::default().fg(Color::White))
-        .title("Headers")
-        .border_type(if app.mode == Mode::RequestHeaders {
-            BorderType::Double
-        } else {
-            BorderType::Plain
-        });
-    rect.render_widget(headers, side_chunks[2]);
+    paragraph_color(
+        rect,
+        side_chunks[2],
+        "Headers",
+        app.headers.as_ref(),
+        app.mode == Mode::RequestHeaders,
+        0,
+        Color::LightCyan,
+    );
 
     paragraph_color(
         rect,
