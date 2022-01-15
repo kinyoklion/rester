@@ -18,7 +18,9 @@ use simplelog::{CombinedLogger, Config, WriteLogger};
 use std::fs::File;
 use std::str;
 use std::str::{FromStr, Utf8Error};
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
+use std::thread::sleep;
 use std::time::{Duration, Instant};
 use std::{error::Error, io};
 
@@ -35,7 +37,7 @@ use tui::{
 };
 
 #[derive(Copy, Clone, PartialEq, Debug)]
-pub(crate) enum Mode {
+enum Mode {
     Url,
     Method,
     UrlParams,
@@ -64,6 +66,7 @@ struct App {
     response: Arc<Mutex<Option<Bytes>>>,
     response_string: Arc<Mutex<Option<String>>>,
     scroll_states: ScrollStates,
+    dirty: Arc<AtomicBool>,
 }
 
 impl App {
@@ -150,6 +153,8 @@ impl App {
         let response = self.response.clone();
         let res_string = self.response_string.clone();
         let headers = self.headers.clone();
+        let dirty = self.dirty.clone();
+
         tokio::spawn(async move {
             let (tx, mut rx) = mpsc::channel(10);
             sender
@@ -179,6 +184,7 @@ impl App {
 
                     *response_bytes = Some(res);
                     *response_string = Some(final_string);
+                    dirty.store(true, Ordering::SeqCst);
                 }
                 _ => {}
             };
@@ -197,6 +203,7 @@ impl App {
             response: Arc::new(Mutex::new(None)),
             response_string: Arc::new(Mutex::new(None)),
             scroll_states: ScrollStates { response: 0 },
+            dirty: Arc::new(AtomicBool::new(false)),
         }
     }
 }
@@ -239,10 +246,16 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 }
 
 fn run_app<B: Backend>(terminal: &mut Terminal<B>, mut app: App) -> io::Result<()> {
+    let mut needs_render = true;
     loop {
-        terminal.draw(|f| ui(f, &app))?;
+        if needs_render {
+            terminal.draw(|f| ui(f, &app))?;
+            needs_render = false;
+            info!("Rendering");
+        }
 
-        if let Ok(present) = event::poll(Duration::from_millis(16)) {
+        sleep(Duration::from_millis(16));
+        if let Ok(present) = event::poll(Duration::from_millis(0)) {
             if present {
                 let start = Instant::now();
                 if let Event::Key(key) = event::read()? {
@@ -266,7 +279,11 @@ fn run_app<B: Backend>(terminal: &mut Terminal<B>, mut app: App) -> io::Result<(
                 let duration = start.elapsed();
 
                 info!("Time elapsed input handling is: {:?}", duration);
+                needs_render = true;
             }
+        }
+        if app.dirty.swap(false, Ordering::SeqCst) {
+            needs_render = true;
         }
     }
 }
