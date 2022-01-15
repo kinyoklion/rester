@@ -1,3 +1,7 @@
+#[macro_use]
+extern crate log;
+extern crate simplelog;
+
 use crate::Mode::Url;
 
 use bytes::Bytes;
@@ -8,16 +12,20 @@ use crossterm::{
 };
 use rester::ui::paragraph::{paragraph, paragraph_color};
 
+use log::LevelFilter;
 use reqwest::header::{HeaderMap, HeaderName, HeaderValue};
+use simplelog::{CombinedLogger, Config, WriteLogger};
+use std::fs::File;
 use std::str;
 use std::str::{FromStr, Utf8Error};
 use std::sync::{Arc, Mutex};
-use std::time::Duration;
+use std::time::{Duration, Instant};
 use std::{error::Error, io};
-use strum_macros::IntoStaticStr;
 
+use tokio::sync::mpsc::Receiver;
 use tokio::sync::{mpsc, oneshot};
 
+use rester::{web_request_handler, Method, Request, Response};
 use tui::{
     backend::{Backend, CrosstermBackend},
     layout::{Alignment, Constraint, Direction, Layout},
@@ -27,7 +35,7 @@ use tui::{
 };
 
 #[derive(Copy, Clone, PartialEq, Debug)]
-enum Mode {
+pub(crate) enum Mode {
     Url,
     Method,
     UrlParams,
@@ -36,33 +44,10 @@ enum Mode {
     ResponseBody,
 }
 
-#[derive(Copy, Clone, PartialEq, IntoStaticStr, Debug)]
-enum Method {
-    GET,
-    POST,
-}
-
-type Responder<T> = mpsc::Sender<T>;
-
-#[derive(Debug)]
-enum Response {
-    Headers(HeaderMap),
-    Body(Bytes),
-    Failure,
-}
-
 #[derive(Debug)]
 enum ScrollDirection {
     Up,
     Down,
-}
-
-#[derive(Debug)]
-struct Request {
-    method: Method,
-    url: String,
-    headers: String,
-    resp: Responder<Response>,
 }
 
 struct ScrollStates {
@@ -218,6 +203,13 @@ impl App {
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    CombinedLogger::init(vec![WriteLogger::new(
+        LevelFilter::Info,
+        Config::default(),
+        File::create("rester.log").unwrap(),
+    )])
+    .unwrap();
+
     enable_raw_mode()?;
     let mut stdout = io::stdout();
     execute!(stdout, EnterAlternateScreen, EnableMouseCapture)?;
@@ -227,45 +219,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let (sender, mut receiver) = mpsc::channel(10);
     let app = App::new(sender.clone());
 
-    tokio::spawn(async move {
-        loop {
-            let client = reqwest::Client::new();
-            let req = receiver.recv().await;
-            // println!("Request {:?}", req);
-            match req {
-                Some(req) => {
-                    // println!("Request {:?}", req);
-                    let mut header_map = HeaderMap::new();
-                    let headers: Vec<&str> = req.headers.split("\r\n").collect();
-
-                    for entry in headers {
-                        if let Some((key, value)) = entry.split_once(":") {
-                            if let Ok(value) = HeaderValue::from_str(value.trim()) {
-                                if let Ok(key) = HeaderName::from_str(key.trim()) {
-                                    header_map.append(key, value);
-                                }
-                            }
-                        }
-                    }
-                    let res = client.get(req.url).headers(header_map).send().await;
-                    // println!("Got {:?}", res);
-                    match res {
-                        Ok(res) => {
-                            req.resp.send(Response::Headers(res.headers().clone()));
-                            let bytes = res.bytes().await;
-                            if let Ok(bytes) = bytes {
-                                req.resp.send(Response::Body(bytes)).await;
-                            }
-                        }
-                        Err(_) => {
-                            req.resp.send(Response::Failure).await;
-                        }
-                    };
-                }
-                _ => {}
-            };
-        }
-    });
+    web_request_handler::WebRequestHandler(receiver);
 
     let res = run_app(&mut terminal, app);
 
@@ -290,6 +244,7 @@ fn run_app<B: Backend>(terminal: &mut Terminal<B>, mut app: App) -> io::Result<(
 
         if let Ok(present) = event::poll(Duration::from_millis(16)) {
             if present {
+                let start = Instant::now();
                 if let Event::Key(key) = event::read()? {
                     match key.code {
                         KeyCode::Esc => {
@@ -307,12 +262,17 @@ fn run_app<B: Backend>(terminal: &mut Terminal<B>, mut app: App) -> io::Result<(
                         },
                     }
                 }
+
+                let duration = start.elapsed();
+
+                info!("Time elapsed input handling is: {:?}", duration);
             }
         }
     }
 }
 
 fn ui<B: Backend>(rect: &mut Frame<B>, app: &App) {
+    let start = Instant::now();
     let size = rect.size();
     let chunks = Layout::default()
         .direction(Direction::Vertical)
@@ -351,15 +311,15 @@ fn ui<B: Backend>(rect: &mut Frame<B>, app: &App) {
     let option = app.response_string.lock().unwrap();
 
     let response_string = match &(*option) {
-        None => "".to_string(),
-        Some(string) => string.clone(),
+        None => "",
+        Some(string) => string.as_str(),
     };
 
     paragraph(
         rect,
         response_chunks[0],
         "Response Body",
-        response_string.as_str(),
+        response_string,
         app.mode == Mode::ResponseBody,
         app.scroll_states.response,
     );
@@ -430,4 +390,7 @@ fn ui<B: Backend>(rect: &mut Frame<B>, app: &App) {
         );
 
     rect.render_widget(copyright, chunks[2]);
+    let duration = start.elapsed();
+
+    // info!("Time elapsed in expensive_function() is: {:?}", duration);
 }

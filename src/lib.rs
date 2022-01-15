@@ -1,1 +1,32 @@
+use bytes::Bytes;
+use reqwest::header::HeaderMap;
+use strum_macros::IntoStaticStr;
+use tokio::sync::mpsc;
+#[macro_use]
+extern crate log;
+
 pub mod ui;
+pub mod web_request_handler;
+
+pub type Responder<T> = mpsc::Sender<T>;
+
+#[derive(Copy, Clone, PartialEq, IntoStaticStr, Debug)]
+pub enum Method {
+    GET,
+    POST,
+}
+
+#[derive(Debug)]
+pub enum Response {
+    Headers(HeaderMap),
+    Body(Bytes),
+    Failure,
+}
+
+#[derive(Debug)]
+pub struct Request {
+    pub method: Method,
+    pub url: String,
+    pub headers: String,
+    pub resp: Responder<Response>,
+}
