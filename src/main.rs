@@ -19,7 +19,7 @@ use std::fs::File;
 use std::str;
 use std::str::{FromStr, Utf8Error};
 use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::{Arc, Mutex};
+use std::sync::{Arc, Mutex, MutexGuard};
 use std::thread::sleep;
 use std::time::{Duration, Instant};
 use std::{error::Error, io};
@@ -54,6 +54,7 @@ enum ScrollDirection {
 
 struct ScrollStates {
     response: u16,
+    response_headers: u16,
 }
 
 /// App holds the state of the application
@@ -65,6 +66,7 @@ struct App {
     sender: mpsc::Sender<Request>,
     response: Arc<Mutex<Option<Bytes>>>,
     response_string: Arc<Mutex<Option<String>>>,
+    response_header_string: Arc<Mutex<Option<String>>>,
     scroll_states: ScrollStates,
     dirty: Arc<AtomicBool>,
 }
@@ -134,11 +136,29 @@ impl App {
                     self.scroll_states.response += 1;
                 }
             },
+            Mode::ResponseHeaders => match direction {
+                ScrollDirection::Up => {
+                    if self.scroll_states.response_headers != 0 {
+                        self.scroll_states.response_headers -= 1;
+                    }
+                }
+                ScrollDirection::Down => {
+                    self.scroll_states.response_headers += 1;
+                }
+            },
             _ => {}
         };
     }
 
     fn handle_response_input(&mut self, code: KeyCode) {
+        match code {
+            KeyCode::Up => self.scroll(ScrollDirection::Up),
+            KeyCode::Down => self.scroll(ScrollDirection::Down),
+            _ => {}
+        };
+    }
+
+    fn handle_response_headers_input(&mut self, code: KeyCode) {
         match code {
             KeyCode::Up => self.scroll(ScrollDirection::Up),
             KeyCode::Down => self.scroll(ScrollDirection::Down),
@@ -154,6 +174,7 @@ impl App {
         let res_string = self.response_string.clone();
         let headers = self.headers.clone();
         let dirty = self.dirty.clone();
+        let response_header_string = self.response_header_string.clone();
 
         tokio::spawn(async move {
             let (tx, mut rx) = mpsc::channel(10);
@@ -166,28 +187,42 @@ impl App {
                 })
                 .await
                 .unwrap();
-            let res = rx.recv().await;
-            match res {
-                Some(Response::Body(res)) => {
-                    let mut response_bytes = response.lock().unwrap();
 
-                    let mut response_string = res_string.lock().unwrap();
+            loop {
+                let res = rx.recv().await;
 
-                    let decoded_string = String::from_utf8_lossy(&res);
-                    let pretty_json = jsonxf::pretty_print(decoded_string.to_string().as_str());
+                match res {
+                    Some(Response::Headers(res)) => {
+                        info!("Got headers {:?}", res);
+                        let header_string = jsonxf::pretty_print(format!("{:?}", res).as_str());
+                        if let Ok(header_string) = header_string {
+                            let mut response_header = response_header_string.lock().unwrap();
+                            *response_header = Some(header_string);
+                        }
+                    }
+                    Some(Response::Body(res)) => {
+                        let mut response_bytes = response.lock().unwrap();
 
-                    let final_string = if let Ok(pretty_json) = pretty_json {
-                        pretty_json
-                    } else {
-                        decoded_string.to_string()
-                    };
+                        let mut response_string = res_string.lock().unwrap();
 
-                    *response_bytes = Some(res);
-                    *response_string = Some(final_string);
-                    dirty.store(true, Ordering::SeqCst);
-                }
-                _ => {}
-            };
+                        let decoded_string = String::from_utf8_lossy(&res);
+                        let pretty_json = jsonxf::pretty_print(decoded_string.to_string().as_str());
+
+                        let final_string = if let Ok(pretty_json) = pretty_json {
+                            pretty_json
+                        } else {
+                            decoded_string.to_string()
+                        };
+
+                        *response_bytes = Some(res);
+                        *response_string = Some(final_string);
+                        dirty.store(true, Ordering::SeqCst);
+                    }
+                    _ => {
+                        break;
+                    }
+                };
+            }
         });
     }
 }
@@ -202,8 +237,12 @@ impl App {
             sender,
             response: Arc::new(Mutex::new(None)),
             response_string: Arc::new(Mutex::new(None)),
-            scroll_states: ScrollStates { response: 0 },
+            scroll_states: ScrollStates {
+                response: 0,
+                response_headers: 0,
+            },
             dirty: Arc::new(AtomicBool::new(false)),
+            response_header_string: Arc::new(Mutex::new(None)),
         }
     }
 }
@@ -254,6 +293,8 @@ fn run_app<B: Backend>(terminal: &mut Terminal<B>, mut app: App) -> io::Result<(
             info!("Rendering");
         }
 
+        // Poll with a timeout used a lot more CPU than expected.
+        // So, for now, it just sleeps for 16ms, then checks for any stimulus.
         sleep(Duration::from_millis(16));
         if let Ok(present) = event::poll(Duration::from_millis(0)) {
             if present {
@@ -271,6 +312,7 @@ fn run_app<B: Backend>(terminal: &mut Terminal<B>, mut app: App) -> io::Result<(
                             Mode::Url => app.handle_url_input(code),
                             Mode::RequestHeaders => app.handle_headers_input(code),
                             Mode::ResponseBody => app.handle_response_input(code),
+                            Mode::ResponseHeaders => app.handle_response_headers_input(code),
                             _ => {}
                         },
                     }
@@ -314,16 +356,20 @@ fn ui<B: Backend>(rect: &mut Frame<B>, app: &App) {
         .constraints([Constraint::Percentage(50), Constraint::Percentage(50)].as_ref())
         .split(horizontal_chunks[1]);
 
-    let response_headers = Block::default()
-        .borders(Borders::ALL)
-        .style(Style::default().fg(Color::White))
-        .title("Response Header")
-        .border_type(if app.mode == Mode::ResponseHeaders {
-            BorderType::Double
-        } else {
-            BorderType::Plain
-        });
-    rect.render_widget(response_headers, response_chunks[1]);
+    let header_option = app.response_header_string.lock().unwrap();
+    let headers_response_string = match &(*header_option) {
+        None => "",
+        Some(string) => string.as_str(),
+    };
+
+    paragraph(
+        rect,
+        response_chunks[1],
+        "Response Headers",
+        headers_response_string,
+        app.mode == Mode::ResponseHeaders,
+        app.scroll_states.response_headers,
+    );
 
     let option = app.response_string.lock().unwrap();
 

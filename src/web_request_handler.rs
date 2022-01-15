@@ -30,7 +30,9 @@ pub fn WebRequestHandler(mut receiver: Receiver<Request>) {
                     // println!("Got {:?}", res);
                     match res {
                         Ok(res) => {
-                            req.resp.send(Response::Headers(res.headers().clone()));
+                            req.resp
+                                .send(Response::Headers(res.headers().clone()))
+                                .await;
                             let bytes = res.bytes().await;
                             if let Ok(bytes) = bytes {
                                 req.resp.send(Response::Body(bytes)).await;
