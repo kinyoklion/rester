@@ -1,7 +1,9 @@
+use crate::persistence::RequestCollection;
 use crate::ui::paragraph::WrappedCache;
 use crate::{Method, Request, Response};
 use bytes::Bytes;
-use crossterm::event::{KeyCode, KeyEvent};
+use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
+use reqwest::RequestBuilder;
 use std::rc::Rc;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
@@ -15,6 +17,12 @@ pub enum Mode {
     RequestHeaders,
     ResponseHeaders,
     ResponseBody,
+}
+
+#[derive(Copy, Clone, PartialEq, Debug)]
+pub enum Modal {
+    Save,
+    None,
 }
 
 #[derive(Debug)]
@@ -46,6 +54,36 @@ pub struct App {
     pub scroll_states: ScrollStates,
     pub cache_states: CacheStates,
     pub dirty: Arc<AtomicBool>,
+    pub modal: Modal,
+    pub request_name: String,
+    request_collection: RequestCollection,
+}
+
+impl App {
+    pub fn new(sender: mpsc::Sender<Request>) -> Self {
+        App {
+            url: String::new(),
+            headers: String::new(),
+            mode: Mode::Url,
+            method: Method::GET,
+            sender,
+            response: Arc::new(Mutex::new(None)),
+            response_string: Arc::new(Mutex::new(None)),
+            scroll_states: ScrollStates {
+                response: 0,
+                response_headers: 0,
+            },
+            cache_states: CacheStates {
+                response: None,
+                response_headers: None,
+            },
+            dirty: Arc::new(AtomicBool::new(false)),
+            response_header_string: Arc::new(Mutex::new(None)),
+            modal: Modal::None,
+            request_name: "".to_string(),
+            request_collection: RequestCollection::new(),
+        }
+    }
 }
 
 impl App {
@@ -76,29 +114,81 @@ impl App {
         }
     }
 
-    pub fn handle_input(&mut self, key: KeyEvent) {
+    pub fn handle_input(&mut self, key: KeyEvent) -> bool {
+        if key.modifiers.contains(KeyModifiers::CONTROL) {
+            match key.code {
+                KeyCode::Char(c) => match c.to_ascii_lowercase() {
+                    's' => {
+                        if self.modal == Modal::None {
+                            self.modal = Modal::Save;
+                        }
+                    }
+                    _ => {}
+                },
+                _ => {}
+            };
+            return false;
+        }
         match key.code {
+            KeyCode::Esc => {
+                return if self.modal == Modal::None {
+                    true
+                } else {
+                    self.modal = Modal::None;
+                    false
+                }
+            }
             KeyCode::Tab => {
                 self.next_mode(false);
             }
             KeyCode::BackTab => {
                 self.next_mode(true);
             }
-            code => match self.mode {
-                Mode::Url => self.handle_url_input(code),
-                Mode::RequestHeaders => self.handle_headers_input(code),
-                Mode::ResponseBody => self.handle_response_input(code),
-                Mode::ResponseHeaders => self.handle_response_headers_input(code),
-                _ => {}
+            code => match self.modal {
+                Modal::Save => self.handle_save_input(code),
+                Modal::None => match self.mode {
+                    Mode::Url => self.handle_url_input(code),
+                    Mode::RequestHeaders => self.handle_headers_input(code),
+                    Mode::ResponseBody => self.handle_response_input(code),
+                    Mode::ResponseHeaders => self.handle_response_headers_input(code),
+                    _ => {}
+                },
             },
         }
+        false
     }
 
-    pub fn handle_url_input(&mut self, code: KeyCode) {
+    fn save_request(&mut self) {
+        if self.url.is_empty() || self.request_name.is_empty() {
+            return;
+        }
+        let mut builder = crate::persistence::RequestBuilder::new(self.request_name.as_str());
+        builder.url(self.url.as_str());
+        builder.method(self.method);
+        builder.headers(self.headers.as_str());
+        self.request_collection.add_request(builder.build());
+        self.request_collection.save();
+        // TODO: Need to implement some error handling here.
+        self.modal = Modal::None;
+    }
+
+    fn handle_save_input(&mut self, code: KeyCode) {
+        match code {
+            KeyCode::Enter => self.save_request(),
+            KeyCode::Char(c) => {
+                self.request_name.push(c);
+            }
+            KeyCode::Backspace => {
+                self.request_name.pop();
+            }
+            _ => {}
+        };
+    }
+
+    fn handle_url_input(&mut self, code: KeyCode) {
         match code {
             KeyCode::Enter => {
                 self.make_request();
-                // app.messages.push(app.input.drain(..).collect());
             }
             KeyCode::Char(c) => {
                 self.url.push(c);
@@ -110,7 +200,7 @@ impl App {
         };
     }
 
-    pub fn handle_headers_input(&mut self, code: KeyCode) {
+    fn handle_headers_input(&mut self, code: KeyCode) {
         match code {
             KeyCode::Enter => {
                 // self.make_request();
@@ -154,7 +244,7 @@ impl App {
         };
     }
 
-    pub fn handle_response_input(&mut self, code: KeyCode) {
+    fn handle_response_input(&mut self, code: KeyCode) {
         match code {
             KeyCode::Up => self.scroll(ScrollDirection::Up),
             KeyCode::Down => self.scroll(ScrollDirection::Down),
@@ -162,7 +252,7 @@ impl App {
         };
     }
 
-    pub fn handle_response_headers_input(&mut self, code: KeyCode) {
+    fn handle_response_headers_input(&mut self, code: KeyCode) {
         match code {
             KeyCode::Up => self.scroll(ScrollDirection::Up),
             KeyCode::Down => self.scroll(ScrollDirection::Down),
@@ -236,29 +326,5 @@ impl App {
                 };
             }
         });
-    }
-}
-
-impl App {
-    pub fn new(sender: mpsc::Sender<Request>) -> Self {
-        App {
-            url: String::new(),
-            headers: String::new(),
-            mode: Mode::Url,
-            method: Method::GET,
-            sender,
-            response: Arc::new(Mutex::new(None)),
-            response_string: Arc::new(Mutex::new(None)),
-            scroll_states: ScrollStates {
-                response: 0,
-                response_headers: 0,
-            },
-            cache_states: CacheStates {
-                response: None,
-                response_headers: None,
-            },
-            dirty: Arc::new(AtomicBool::new(false)),
-            response_header_string: Arc::new(Mutex::new(None)),
-        }
     }
 }

@@ -24,8 +24,10 @@ use std::time::{Duration, Instant};
 
 use tokio::sync::mpsc;
 
-use rester::app::{App, Mode};
+use rester::app::{App, Modal, Mode};
+use rester::ui::centered_rect;
 use rester::web_request_handler;
+use tui::widgets::Clear;
 use tui::{
     backend::{Backend, CrosstermBackend},
     layout::{Alignment, Constraint, Direction, Layout},
@@ -87,11 +89,15 @@ fn run_app<B: Backend>(terminal: &mut Terminal<B>, mut app: App) -> io::Result<(
                 let start = Instant::now();
                 if let Event::Key(key) = event::read()? {
                     match key.code {
-                        KeyCode::Esc => {
-                            return Ok(());
-                            // app.messages.push(app.input.drain(..).collect());
+                        // KeyCode::Esc => {
+                        //     return Ok(());
+                        //     // app.messages.push(app.input.drain(..).collect());
+                        // }
+                        _ => {
+                            if app.handle_input(key) {
+                                return Ok(());
+                            }
                         }
-                        _ => app.handle_input(key),
                     }
                 }
 
@@ -238,6 +244,29 @@ fn ui<B: Backend>(rect: &mut Frame<B>, app: &mut App) {
                 .title("Copyright")
                 .border_type(BorderType::Plain),
         );
+
+    if app.modal == Modal::Save {
+        let block = Block::default().style(Style::default().bg(Color::Blue));
+        rect.render_widget(block.clone(), chunks[1]);
+        rect.render_widget(block.clone(), chunks[0]);
+        rect.render_widget(block, chunks[2]);
+
+        // let block = Block::default().title("Save").borders(Borders::ALL);
+        let area = centered_rect(60, 20, size);
+        rect.render_widget(Clear, area);
+        paragraph_color(
+            rect,
+            area,
+            "Request Name",
+            app.request_name.as_str(),
+            true,
+            0,
+            Color::Cyan,
+            None,
+        );
+        // rect.render_widget(Clear, area); //this clears out the background
+        // rect.render_widget(block, area);
+    }
 
     rect.render_widget(copyright, chunks[2]);
     let duration = start.elapsed();

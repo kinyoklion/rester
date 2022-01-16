@@ -1,17 +1,19 @@
 use bytes::Bytes;
 use reqwest::header::HeaderMap;
+use serde::{Deserialize, Serialize};
 use strum_macros::IntoStaticStr;
 use tokio::sync::mpsc;
 #[macro_use]
 extern crate log;
 
 pub mod app;
+pub mod persistence;
 pub mod ui;
 pub mod web_request_handler;
 
 pub type Responder<T> = mpsc::Sender<T>;
 
-#[derive(Copy, Clone, PartialEq, IntoStaticStr, Debug)]
+#[derive(Copy, Clone, PartialEq, IntoStaticStr, Debug, Serialize, Deserialize)]
 pub enum Method {
     GET,
     POST,
