@@ -10,15 +10,16 @@ use crossterm::{
     execute,
     terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
 };
-use rester::ui::paragraph::{paragraph, paragraph_color};
+use rester::ui::paragraph::{paragraph, paragraph_color, WrappedCache};
 
 use log::LevelFilter;
 use reqwest::header::{HeaderMap, HeaderName, HeaderValue};
 use simplelog::{CombinedLogger, Config, WriteLogger};
 use std::fs::File;
+use std::rc::Rc;
 use std::str;
 use std::str::{FromStr, Utf8Error};
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex, MutexGuard};
 use std::thread::sleep;
 use std::time::{Duration, Instant};
@@ -57,6 +58,11 @@ struct ScrollStates {
     response_headers: u16,
 }
 
+struct CacheStates {
+    response: Option<Rc<WrappedCache>>,
+    response_headers: Option<Rc<WrappedCache>>,
+}
+
 /// App holds the state of the application
 struct App {
     url: String,
@@ -68,6 +74,7 @@ struct App {
     response_string: Arc<Mutex<Option<String>>>,
     response_header_string: Arc<Mutex<Option<String>>>,
     scroll_states: ScrollStates,
+    cache_states: CacheStates,
     dirty: Arc<AtomicBool>,
 }
 
@@ -166,7 +173,16 @@ impl App {
         };
     }
 
-    fn make_request(&self) {
+    fn reset(&mut self) {
+        self.scroll_states.response = 0;
+        self.scroll_states.response_headers = 0;
+        *self.response_string.lock().unwrap() = None;
+        *self.response_header_string.lock().unwrap() = None;
+        *self.response.lock().unwrap() = None;
+    }
+
+    fn make_request(&mut self) {
+        self.reset();
         let sender = self.sender.clone();
         let method = self.method;
         let url = self.url.clone();
@@ -240,6 +256,10 @@ impl App {
             scroll_states: ScrollStates {
                 response: 0,
                 response_headers: 0,
+            },
+            cache_states: CacheStates {
+                response: None,
+                response_headers: None,
             },
             dirty: Arc::new(AtomicBool::new(false)),
             response_header_string: Arc::new(Mutex::new(None)),
@@ -362,14 +382,18 @@ fn ui<B: Backend>(rect: &mut Frame<B>, app: &mut App) {
         Some(string) => string.as_str(),
     };
 
-    app.scroll_states.response_headers = paragraph(
+    let header_updates = paragraph(
         rect,
         response_chunks[1],
         "Response Headers",
         headers_response_string,
         app.mode == Mode::ResponseHeaders,
         app.scroll_states.response_headers,
+        app.cache_states.response_headers.clone(),
     );
+
+    app.scroll_states.response_headers = header_updates.0;
+    app.cache_states.response_headers = Some(header_updates.1);
 
     let option = app.response_string.lock().unwrap();
 
@@ -378,14 +402,17 @@ fn ui<B: Backend>(rect: &mut Frame<B>, app: &mut App) {
         Some(string) => string.as_str(),
     };
 
-    app.scroll_states.response = paragraph(
+    let response_updates = paragraph(
         rect,
         response_chunks[0],
         "Response Body",
         response_string,
         app.mode == Mode::ResponseBody,
         app.scroll_states.response,
+        app.cache_states.response.clone(),
     );
+    app.scroll_states.response = response_updates.0;
+    app.cache_states.response = Some(response_updates.1);
 
     let side_chunks = Layout::default()
         .direction(Direction::Vertical)
@@ -408,6 +435,7 @@ fn ui<B: Backend>(rect: &mut Frame<B>, app: &mut App) {
         method_str,
         app.mode == Mode::Method,
         0,
+        None,
     );
 
     let params = Block::default()
@@ -429,6 +457,7 @@ fn ui<B: Backend>(rect: &mut Frame<B>, app: &mut App) {
         app.mode == Mode::RequestHeaders,
         0,
         Color::LightCyan,
+        None,
     );
 
     paragraph_color(
@@ -439,6 +468,7 @@ fn ui<B: Backend>(rect: &mut Frame<B>, app: &mut App) {
         app.mode == Mode::Url,
         0,
         Color::LightCyan,
+        None,
     );
 
     let copyright = Paragraph::new("Ryan Lamb 2022")

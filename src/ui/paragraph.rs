@@ -1,8 +1,17 @@
+use std::rc::Rc;
+use tokio::time::Instant;
 use tui::backend::Backend;
 use tui::layout::{Alignment, Rect};
 use tui::style::{Color, Style};
 use tui::widgets::{Block, BorderType, Borders, Paragraph, Wrap};
 use tui::Frame;
+
+pub struct WrappedCache {
+    id: usize,
+    width: u16,
+    wrapped: String,
+    lines: u16,
+}
 
 fn count_newlines(s: &str) -> u16 {
     s.as_bytes().iter().filter(|&&c| c == b'\n').count() as u16
@@ -15,8 +24,18 @@ pub fn paragraph<B: Backend>(
     text: &str,
     active: bool,
     scroll: u16,
-) -> u16 {
-    paragraph_color(app_rect, rect, title, text, active, scroll, Color::White)
+    cache: Option<Rc<WrappedCache>>,
+) -> (u16, Rc<WrappedCache>) {
+    paragraph_color(
+        app_rect,
+        rect,
+        title,
+        text,
+        active,
+        scroll,
+        Color::White,
+        cache,
+    )
 }
 
 pub fn paragraph_color<B: Backend>(
@@ -27,7 +46,8 @@ pub fn paragraph_color<B: Backend>(
     active: bool,
     scroll: u16,
     color: Color,
-) -> u16 {
+    cache: Option<Rc<WrappedCache>>,
+) -> (u16, Rc<WrappedCache>) {
     let block = Block::default()
         .borders(Borders::ALL)
         .style(Style::default().fg(Color::White))
@@ -38,12 +58,20 @@ pub fn paragraph_color<B: Backend>(
             BorderType::Plain
         });
     let inner_rect = block.inner(rect);
-    info!("Width {:?}", inner_rect.width);
-    let wrapped = textwrap::fill(text, inner_rect.width as usize);
-    let lines = count_newlines(wrapped.as_str());
 
-    let height_adjusted_lines = if lines >= inner_rect.height {
-        (lines - inner_rect.height) + 1
+    let cur_cache = match cache {
+        None => makeCache(text, inner_rect),
+        Some(cache) => {
+            if cache.id != text.as_ptr() as *const _ as usize || cache.width != inner_rect.width {
+                makeCache(text, inner_rect)
+            } else {
+                cache
+            }
+        }
+    };
+
+    let height_adjusted_lines = if cur_cache.lines >= inner_rect.height {
+        (cur_cache.lines - inner_rect.height) + 1
     } else {
         0
     };
@@ -54,7 +82,7 @@ pub fn paragraph_color<B: Backend>(
         scroll
     };
 
-    let response_body = Paragraph::new(wrapped.as_str())
+    let response_body = Paragraph::new(cur_cache.wrapped.as_str())
         .alignment(Alignment::Left)
         .style(Style::default().fg(Color::LightCyan))
         .style(Style::default().fg(color))
@@ -62,5 +90,18 @@ pub fn paragraph_color<B: Backend>(
         .scroll((capped_scroll, 0))
         .block(block);
     app_rect.render_widget(response_body, rect);
-    capped_scroll
+    (capped_scroll, cur_cache)
+}
+
+fn makeCache(text: &str, inner_rect: Rect) -> Rc<WrappedCache> {
+    let wrapped = textwrap::fill(text, inner_rect.width as usize);
+    let lines = count_newlines(wrapped.as_str());
+
+    let cache = WrappedCache {
+        id: text.as_ptr() as *const _ as usize,
+        width: inner_rect.width,
+        wrapped,
+        lines,
+    };
+    Rc::new(cache)
 }
