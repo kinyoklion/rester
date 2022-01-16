@@ -5,6 +5,7 @@ use tokio::sync::mpsc;
 #[macro_use]
 extern crate log;
 
+pub mod app;
 pub mod ui;
 pub mod web_request_handler;
 
