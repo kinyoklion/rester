@@ -2,33 +2,33 @@
 extern crate log;
 extern crate simplelog;
 
-use crate::Mode::Url;
 
-use bytes::Bytes;
+
+
 use crossterm::{
     event::{self, DisableMouseCapture, EnableMouseCapture, Event, KeyCode},
     execute,
     terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
 };
-use rester::ui::paragraph::{paragraph, paragraph_color, WrappedCache};
+use rester::ui::paragraph::{paragraph, paragraph_color};
 
 use log::LevelFilter;
 
 use simplelog::{CombinedLogger, Config, WriteLogger};
 use std::fs::File;
-use std::rc::Rc;
+
 use std::str;
 
 use std::io;
-use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::{Arc, Mutex};
+use std::sync::atomic::{Ordering};
+
 use std::thread::sleep;
 use std::time::{Duration, Instant};
 
 use tokio::sync::mpsc;
 
 use rester::app::{App, Mode};
-use rester::{web_request_handler, Method, Request, Response};
+use rester::{web_request_handler};
 use tui::{
     backend::{Backend, CrosstermBackend},
     layout::{Alignment, Constraint, Direction, Layout},
