@@ -2,9 +2,6 @@
 extern crate log;
 extern crate simplelog;
 
-
-
-
 use crossterm::{
     event::{self, DisableMouseCapture, EnableMouseCapture, Event, KeyCode},
     execute,
@@ -20,7 +17,7 @@ use std::fs::File;
 use std::str;
 
 use std::io;
-use std::sync::atomic::{Ordering};
+use std::sync::atomic::Ordering;
 
 use std::thread::sleep;
 use std::time::{Duration, Instant};
@@ -28,7 +25,7 @@ use std::time::{Duration, Instant};
 use tokio::sync::mpsc;
 
 use rester::app::{App, Mode};
-use rester::{web_request_handler};
+use rester::web_request_handler;
 use tui::{
     backend::{Backend, CrosstermBackend},
     layout::{Alignment, Constraint, Direction, Layout},
@@ -94,7 +91,7 @@ fn run_app<B: Backend>(terminal: &mut Terminal<B>, mut app: App) -> io::Result<(
                             return Ok(());
                             // app.messages.push(app.input.drain(..).collect());
                         }
-                        code => app.handle_input(code),
+                        _ => app.handle_input(key),
                     }
                 }
 

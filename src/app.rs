@@ -1,7 +1,7 @@
 use crate::ui::paragraph::WrappedCache;
 use crate::{Method, Request, Response};
 use bytes::Bytes;
-use crossterm::event::KeyCode;
+use crossterm::event::{KeyCode, KeyEvent};
 use std::rc::Rc;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
@@ -49,7 +49,7 @@ pub struct App {
 }
 
 impl App {
-    pub fn next_mode(&mut self) {
+    pub fn next_mode(&mut self, previous: bool) {
         static MODES: [Mode; 6] = [
             Mode::Url,
             Mode::Method,
@@ -59,7 +59,16 @@ impl App {
             Mode::ResponseBody,
         ];
         let mut index = MODES.iter().position(|mode| mode == &self.mode).unwrap();
-        index += 1usize;
+        if previous {
+            if index > 0 {
+                index -= 1usize
+            } else {
+                index = MODES.len() - 1;
+            }
+        } else {
+            index += 1usize;
+        }
+
         if index < MODES.len() {
             self.mode = MODES[index];
         } else {
@@ -67,10 +76,13 @@ impl App {
         }
     }
 
-    pub fn handle_input(&mut self, code: KeyCode) {
-        match code {
+    pub fn handle_input(&mut self, key: KeyEvent) {
+        match key.code {
             KeyCode::Tab => {
-                self.next_mode();
+                self.next_mode(false);
+            }
+            KeyCode::BackTab => {
+                self.next_mode(true);
             }
             code => match self.mode {
                 Mode::Url => self.handle_url_input(code),
