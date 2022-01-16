@@ -15,8 +15,8 @@ pub fn paragraph<B: Backend>(
     text: &str,
     active: bool,
     scroll: u16,
-) {
-    paragraph_color(app_rect, rect, title, text, active, scroll, Color::White);
+) -> u16 {
+    paragraph_color(app_rect, rect, title, text, active, scroll, Color::White)
 }
 
 pub fn paragraph_color<B: Backend>(
@@ -27,7 +27,7 @@ pub fn paragraph_color<B: Backend>(
     active: bool,
     scroll: u16,
     color: Color,
-) {
+) -> u16 {
     let block = Block::default()
         .borders(Borders::ALL)
         .style(Style::default().fg(Color::White))
@@ -62,4 +62,5 @@ pub fn paragraph_color<B: Backend>(
         .scroll((capped_scroll, 0))
         .block(block);
     app_rect.render_widget(response_body, rect);
+    capped_scroll
 }

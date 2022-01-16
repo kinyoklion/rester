@@ -288,7 +288,7 @@ fn run_app<B: Backend>(terminal: &mut Terminal<B>, mut app: App) -> io::Result<(
     let mut needs_render = true;
     loop {
         if needs_render {
-            terminal.draw(|f| ui(f, &app))?;
+            terminal.draw(|f| ui(f, &mut app))?;
             needs_render = false;
             info!("Rendering");
         }
@@ -330,7 +330,7 @@ fn run_app<B: Backend>(terminal: &mut Terminal<B>, mut app: App) -> io::Result<(
     }
 }
 
-fn ui<B: Backend>(rect: &mut Frame<B>, app: &App) {
+fn ui<B: Backend>(rect: &mut Frame<B>, app: &mut App) {
     let start = Instant::now();
     let size = rect.size();
     let chunks = Layout::default()
@@ -362,7 +362,7 @@ fn ui<B: Backend>(rect: &mut Frame<B>, app: &App) {
         Some(string) => string.as_str(),
     };
 
-    paragraph(
+    app.scroll_states.response_headers = paragraph(
         rect,
         response_chunks[1],
         "Response Headers",
@@ -378,7 +378,7 @@ fn ui<B: Backend>(rect: &mut Frame<B>, app: &App) {
         Some(string) => string.as_str(),
     };
 
-    paragraph(
+    app.scroll_states.response = paragraph(
         rect,
         response_chunks[0],
         "Response Body",
