@@ -209,7 +209,6 @@ impl App {
 
                 match res {
                     Some(Response::Headers(res)) => {
-                        info!("Got headers {:?}", res);
                         let header_string = jsonxf::pretty_print(format!("{:?}", res).as_str());
                         if let Ok(header_string) = header_string {
                             let mut response_header = response_header_string.lock().unwrap();
@@ -310,7 +309,6 @@ fn run_app<B: Backend>(terminal: &mut Terminal<B>, mut app: App) -> io::Result<(
         if needs_render {
             terminal.draw(|f| ui(f, &mut app))?;
             needs_render = false;
-            info!("Rendering");
         }
 
         // Poll with a timeout used a lot more CPU than expected.
@@ -485,5 +483,5 @@ fn ui<B: Backend>(rect: &mut Frame<B>, app: &mut App) {
     rect.render_widget(copyright, chunks[2]);
     let duration = start.elapsed();
 
-    // info!("Time elapsed in expensive_function() is: {:?}", duration);
+    info!("Time elapsed rendering ui is: {:?}", duration);
 }

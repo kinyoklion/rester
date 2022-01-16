@@ -44,7 +44,7 @@ pub fn WebRequestHandler(mut receiver: Receiver<Request>) {
                     };
                 }
                 _ => {
-                    info!("Request not present");
+                    break;
                 }
             };
         }
