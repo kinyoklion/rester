@@ -13,20 +13,19 @@ use crossterm::{
 use rester::ui::paragraph::{paragraph, paragraph_color, WrappedCache};
 
 use log::LevelFilter;
-use reqwest::header::{HeaderMap, HeaderName, HeaderValue};
+
 use simplelog::{CombinedLogger, Config, WriteLogger};
 use std::fs::File;
 use std::rc::Rc;
 use std::str;
-use std::str::{FromStr, Utf8Error};
-use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
-use std::sync::{Arc, Mutex, MutexGuard};
+
+use std::io;
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::{Arc, Mutex};
 use std::thread::sleep;
 use std::time::{Duration, Instant};
-use std::{error::Error, io};
 
-use tokio::sync::mpsc::Receiver;
-use tokio::sync::{mpsc, oneshot};
+use tokio::sync::mpsc;
 
 use rester::{web_request_handler, Method, Request, Response};
 use tui::{
@@ -281,10 +280,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let backend = CrosstermBackend::new(stdout);
     let mut terminal = Terminal::new(backend)?;
 
-    let (sender, mut receiver) = mpsc::channel(10);
-    let app = App::new(sender.clone());
+    let (sender, receiver) = mpsc::channel(10);
+    let app = App::new(sender);
 
-    web_request_handler::WebRequestHandler(receiver);
+    web_request_handler::web_request_handler(receiver);
 
     let res = run_app(&mut terminal, app);
 
@@ -300,7 +299,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         println!("{:?}", err)
     }
 
-    return Ok(());
+    Ok(())
 }
 
 fn run_app<B: Backend>(terminal: &mut Terminal<B>, mut app: App) -> io::Result<()> {

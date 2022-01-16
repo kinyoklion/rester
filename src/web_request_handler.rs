@@ -4,7 +4,7 @@ use std::str;
 use std::str::FromStr;
 use tokio::sync::mpsc::Receiver;
 
-pub fn WebRequestHandler(mut receiver: Receiver<Request>) {
+pub fn web_request_handler(mut receiver: Receiver<Request>) {
     tokio::spawn(async move {
         loop {
             let client = reqwest::Client::new();
@@ -30,16 +30,32 @@ pub fn WebRequestHandler(mut receiver: Receiver<Request>) {
                     // println!("Got {:?}", res);
                     match res {
                         Ok(res) => {
-                            req.resp
+                            match req
+                                .resp
                                 .send(Response::Headers(res.headers().clone()))
-                                .await;
-                            let bytes = res.bytes().await;
-                            if let Ok(bytes) = bytes {
-                                req.resp.send(Response::Body(bytes)).await;
+                                .await
+                            {
+                                Ok(_) => {
+                                    let bytes = res.bytes().await;
+                                    if let Ok(bytes) = bytes {
+                                        if let Err(err) = req.resp.send(Response::Body(bytes)).await
+                                        {
+                                            error!("Error replying to request {:?}", err);
+                                        }
+                                    }
+                                }
+                                Err(err) => {
+                                    error!("Error sending request: {:?}", err);
+                                    if let Err(err) = req.resp.send(Response::Failure).await {
+                                        error!("Error replying to request {:?}", err);
+                                    }
+                                }
                             }
                         }
                         Err(_) => {
-                            req.resp.send(Response::Failure).await;
+                            if let Err(err) = req.resp.send(Response::Failure).await {
+                                error!("Error replying to request {:?}", err);
+                            }
                         }
                     };
                 }

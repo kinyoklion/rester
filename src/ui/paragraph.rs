@@ -1,9 +1,9 @@
 use std::rc::Rc;
-use tokio::time::Instant;
+
 use tui::backend::Backend;
 use tui::layout::{Alignment, Rect};
 use tui::style::{Color, Style};
-use tui::widgets::{Block, BorderType, Borders, Paragraph, Wrap};
+use tui::widgets::{Block, BorderType, Borders, Paragraph};
 use tui::Frame;
 
 pub struct WrappedCache {
@@ -60,10 +60,10 @@ pub fn paragraph_color<B: Backend>(
     let inner_rect = block.inner(rect);
 
     let cur_cache = match cache {
-        None => makeCache(text, inner_rect),
+        None => make_cache(text, inner_rect),
         Some(cache) => {
             if cache.id != text.as_ptr() as *const _ as usize || cache.width != inner_rect.width {
-                makeCache(text, inner_rect)
+                make_cache(text, inner_rect)
             } else {
                 cache
             }
@@ -93,7 +93,7 @@ pub fn paragraph_color<B: Backend>(
     (capped_scroll, cur_cache)
 }
 
-fn makeCache(text: &str, inner_rect: Rect) -> Rc<WrappedCache> {
+fn make_cache(text: &str, inner_rect: Rect) -> Rc<WrappedCache> {
     let wrapped = textwrap::fill(text, inner_rect.width as usize);
     let lines = count_newlines(wrapped.as_str());
 
