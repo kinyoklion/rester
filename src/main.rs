@@ -202,16 +202,18 @@ fn ui<B: Backend>(rect: &mut Frame<B>, app: &mut App) {
         });
     rect.render_widget(params, side_chunks[1]);
 
-    paragraph_color(
+    let header_res = paragraph_color(
         rect,
         side_chunks[2],
         "Headers",
-        app.headers.as_ref(),
+        app.headers.as_str(),
         app.mode == Mode::RequestHeaders,
-        0,
+        app.headers.scroll,
         Color::LightCyan,
-        None,
+        app.headers.cache.clone(),
     );
+
+    app.headers.update(header_res);
 
     paragraph_color(
         rect,

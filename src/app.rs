@@ -5,7 +5,6 @@ use crate::{Method, Request, Response};
 use bytes::Bytes;
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 
-
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 use tokio::sync::mpsc;
@@ -33,7 +32,7 @@ pub struct App {
     pub url: ParagraphWithState,
     pub mode: Mode,
     pub method: Method,
-    pub headers: String,
+    pub headers: ParagraphWithState,
     pub sender: mpsc::Sender<Request>,
     pub response: Arc<Mutex<Option<Bytes>>>,
     pub response_paragraph: Arc<Mutex<ParagraphWithState>>,
@@ -49,7 +48,7 @@ impl App {
     pub fn new(sender: mpsc::Sender<Request>) -> Self {
         App {
             url: ParagraphWithState::new("".to_string(), false, true),
-            headers: String::new(),
+            headers: ParagraphWithState::new("".to_string(), true, true),
             mode: Mode::Url,
             method: Method::GET,
             sender,
@@ -149,20 +148,23 @@ impl App {
             }
             KeyCode::Tab => {
                 self.next_mode(false);
+                return false;
             }
             KeyCode::BackTab => {
                 self.next_mode(true);
+                return false;
             }
-            code => match self.modal {
-                Modal::Save => self.handle_save_input(code),
-                Modal::Requests => self.handle_request_input(code),
-                Modal::None => match self.mode {
-                    Mode::Url => self.handle_url_input(key),
-                    Mode::RequestHeaders => self.handle_headers_input(code),
-                    Mode::ResponseBody => self.handle_response_input(key),
-                    Mode::ResponseHeaders => self.handle_response_headers_input(key),
-                    _ => {}
-                },
+            _ => {}
+        }
+        match self.modal {
+            Modal::Save => self.handle_save_input(key),
+            Modal::Requests => self.handle_request_input(key),
+            Modal::None => match self.mode {
+                Mode::Url => self.handle_url_input(key),
+                Mode::RequestHeaders => self.handle_headers_input(key),
+                Mode::ResponseBody => self.handle_response_input(key),
+                Mode::ResponseHeaders => self.handle_response_headers_input(key),
+                _ => {}
             },
         }
         false
@@ -182,8 +184,8 @@ impl App {
         self.modal = Modal::None;
     }
 
-    fn handle_save_input(&mut self, code: KeyCode) {
-        match code {
+    fn handle_save_input(&mut self, key: KeyEvent) {
+        match key.code {
             KeyCode::Enter => self.save_request(),
             KeyCode::Char(c) => {
                 self.request_name.push(c);
@@ -195,8 +197,8 @@ impl App {
         };
     }
 
-    fn handle_request_input(&mut self, code: KeyCode) {
-        match code {
+    fn handle_request_input(&mut self, key: KeyEvent) {
+        match key.code {
             KeyCode::Enter => {
                 let index = self.request_selection_state.selected().unwrap_or(0);
 
@@ -206,7 +208,7 @@ impl App {
                 self.url.set_value(request.url.clone());
                 self.method = request.method;
                 self.request_name = request.key.clone();
-                self.headers = request.headers_to_string();
+                self.headers.set_value(request.headers_to_string());
 
                 self.modal = Modal::None;
             }
@@ -232,22 +234,8 @@ impl App {
         self.url.handle_input(event)
     }
 
-    fn handle_headers_input(&mut self, code: KeyCode) {
-        match code {
-            KeyCode::Enter => {
-                // self.make_request();
-                // app.messages.push(app.input.drain(..).collect());
-                self.headers.push('\r');
-                self.headers.push('\n');
-            }
-            KeyCode::Char(c) => {
-                self.headers.push(c);
-            }
-            KeyCode::Backspace => {
-                self.headers.pop();
-            }
-            _ => {}
-        };
+    fn handle_headers_input(&mut self, event: KeyEvent) {
+        self.headers.handle_input(event);
     }
 
     fn handle_response_input(&mut self, event: KeyEvent) {
@@ -274,7 +262,7 @@ impl App {
         let url = String::from(self.url.as_str());
         let response = self.response.clone();
         let res_paragraph = self.response_paragraph.clone();
-        let headers = self.headers.clone();
+        let headers = String::from(self.headers.as_str());
         let dirty = self.dirty.clone();
         let response_header_paragraph = self.response_header_paragraph.clone();
 

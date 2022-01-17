@@ -44,7 +44,7 @@ impl ParagraphWithState {
         match key.code {
             KeyCode::Up => self.scroll(ScrollDirection::Up),
             KeyCode::Down => self.scroll(ScrollDirection::Down),
-            KeyCode::Char(_) | KeyCode::Backspace => {
+            KeyCode::Char(_) | KeyCode::Backspace | KeyCode::Enter => {
                 self.edit(key.code);
             }
             _ => {}
@@ -58,9 +58,17 @@ impl ParagraphWithState {
         match code {
             KeyCode::Char(c) => {
                 self.value.push(c);
+                self.cache = None;
             }
             KeyCode::Backspace => {
                 self.value.pop();
+                self.cache = None;
+            }
+            KeyCode::Enter => {
+                self.value.push('\r');
+                self.value.push('\n');
+                self.scroll += 1;
+                self.cache = None;
             }
             _ => {}
         }
