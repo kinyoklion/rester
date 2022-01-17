@@ -89,16 +89,8 @@ fn run_app<B: Backend>(terminal: &mut Terminal<B>, mut app: App) -> io::Result<(
             if present {
                 let start = Instant::now();
                 if let Event::Key(key) = event::read()? {
-                    match key.code {
-                        // KeyCode::Esc => {
-                        //     return Ok(());
-                        //     // app.messages.push(app.input.drain(..).collect());
-                        // }
-                        _ => {
-                            if app.handle_input(key) {
-                                return Ok(());
-                            }
-                        }
+                    if app.handle_input(key) {
+                        return Ok(());
                     }
                 }
 
@@ -270,7 +262,6 @@ fn ui<B: Backend>(rect: &mut Frame<B>, app: &mut App) {
         rect.render_widget(block.clone(), chunks[0]);
         rect.render_widget(block, chunks[2]);
 
-        // let block = Block::default().title("Save").borders(Borders::ALL);
         let area = centered_rect(60, 20, size);
         rect.render_widget(Clear, area);
         paragraph_color(
@@ -283,8 +274,6 @@ fn ui<B: Backend>(rect: &mut Frame<B>, app: &mut App) {
             Color::Cyan,
             None,
         );
-        // rect.render_widget(Clear, area); //this clears out the background
-        // rect.render_widget(block, area);
     }
 
     rect.render_widget(copyright, chunks[2]);

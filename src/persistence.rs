@@ -138,6 +138,12 @@ impl RequestCollection {
         };
     }
 
+    pub fn remove_request(&mut self, index: usize) {
+        if index < self.requests.len() {
+            self.requests.remove(index);
+        }
+    }
+
     pub fn save(&self) {
         let serialized = serde_json::to_string_pretty(&self.requests);
         info!("Serialized: {:?}", serialized);

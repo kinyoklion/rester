@@ -161,9 +161,13 @@ impl App {
             Modal::Requests => self.handle_request_input(key),
             Modal::None => match self.mode {
                 Mode::Url => self.handle_url_input(key),
-                Mode::RequestHeaders => self.handle_headers_input(key),
-                Mode::ResponseBody => self.handle_response_input(key),
-                Mode::ResponseHeaders => self.handle_response_headers_input(key),
+                Mode::RequestHeaders => self.headers.handle_input(key),
+                Mode::ResponseBody => self.response_paragraph.lock().unwrap().handle_input(key),
+                Mode::ResponseHeaders => self
+                    .response_header_paragraph
+                    .lock()
+                    .unwrap()
+                    .handle_input(key),
                 _ => {}
             },
         }
@@ -222,6 +226,18 @@ impl App {
                 self.request_collection.requests.len(),
                 self.request_selection_state.selected().unwrap_or(0),
             ))),
+            KeyCode::Delete => {
+                if let Some(index) = self.request_selection_state.selected() {
+                    self.request_collection.remove_request(index);
+                    self.request_collection.save();
+                    if index > 0 {
+                        self.request_selection_state.select(Some(index - 1));
+                    }
+                    if self.request_collection.requests.len() == 0 {
+                        self.modal = Modal::None;
+                    }
+                }
+            }
             _ => {}
         };
     }
@@ -232,21 +248,6 @@ impl App {
             return;
         }
         self.url.handle_input(event)
-    }
-
-    fn handle_headers_input(&mut self, event: KeyEvent) {
-        self.headers.handle_input(event);
-    }
-
-    fn handle_response_input(&mut self, event: KeyEvent) {
-        self.response_paragraph.lock().unwrap().handle_input(event);
-    }
-
-    fn handle_response_headers_input(&mut self, event: KeyEvent) {
-        self.response_header_paragraph
-            .lock()
-            .unwrap()
-            .handle_input(event);
     }
 
     fn reset(&mut self) {
