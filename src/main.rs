@@ -85,21 +85,28 @@ fn run_app<B: Backend>(terminal: &mut Terminal<B>, mut app: App) -> io::Result<(
         // Poll with a timeout used a lot more CPU than expected.
         // So, for now, it just sleeps for 16ms, then checks for any stimulus.
         sleep(Duration::from_millis(16));
-        if let Ok(present) = event::poll(Duration::from_millis(0)) {
-            if present {
-                let start = Instant::now();
-                if let Event::Key(key) = event::read()? {
-                    if app.handle_input(key) {
-                        return Ok(());
+        loop {
+            if let Ok(present) = event::poll(Duration::from_millis(0)) {
+                if present {
+                    let start = Instant::now();
+                    if let Event::Key(key) = event::read()? {
+                        if app.handle_input(key) {
+                            return Ok(());
+                        }
                     }
+
+                    let duration = start.elapsed();
+
+                    info!("Time elapsed input handling is: {:?}", duration);
+                    needs_render = true;
+                } else {
+                    break;
                 }
-
-                let duration = start.elapsed();
-
-                info!("Time elapsed input handling is: {:?}", duration);
-                needs_render = true;
+            } else {
+                break;
             }
         }
+
         if app.dirty.swap(false, Ordering::SeqCst) {
             needs_render = true;
         }

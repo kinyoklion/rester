@@ -1,6 +1,6 @@
-
 use std::sync::Arc;
 
+use crate::ui::count_newlines;
 use tui::backend::Backend;
 use tui::layout::{Alignment, Rect};
 use tui::style::{Color, Style};
@@ -14,8 +14,10 @@ pub struct WrappedCache {
     lines: u16,
 }
 
-fn count_newlines(s: &str) -> u16 {
-    s.as_bytes().iter().filter(|&&c| c == b'\n').count() as u16
+impl WrappedCache {
+    pub fn get_lines(&self) -> u16 {
+        self.lines
+    }
 }
 
 pub fn paragraph<B: Backend>(

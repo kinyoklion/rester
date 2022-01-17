@@ -67,7 +67,10 @@ impl ParagraphWithState {
             KeyCode::Enter => {
                 self.value.push('\r');
                 self.value.push('\n');
-                self.scroll += 1;
+                // TODO: This will need to change with cursor editing.
+                if let Some(cache) = &self.cache {
+                    self.scroll = cache.get_lines();
+                }
                 self.cache = None;
             }
             _ => {}
