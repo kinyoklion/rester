@@ -1,7 +1,7 @@
 use crate::ui::paragraph::WrappedCache;
 use crate::ScrollDirection;
 use crossterm::event::{KeyCode, KeyEvent};
-use std::rc::Rc;
+
 use std::sync::Arc;
 
 pub struct ParagraphWithState {

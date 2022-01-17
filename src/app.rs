@@ -1,11 +1,11 @@
 use crate::paragraph_with_state::ParagraphWithState;
 use crate::persistence::RequestCollection;
-use crate::ui::paragraph::WrappedCache;
-use crate::{Method, Request, Response, ScrollDirection};
+
+use crate::{Method, Request, Response};
 use bytes::Bytes;
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
-use reqwest::RequestBuilder;
-use std::rc::Rc;
+
+
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 use tokio::sync::mpsc;

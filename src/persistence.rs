@@ -1,7 +1,7 @@
 use crate::Method;
-use crate::Response::Headers;
+
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
+
 use std::fs::File;
 use std::io::{BufReader, Write};
 use std::path::Path;
@@ -81,7 +81,7 @@ impl RequestBuilder {
         self
     }
 
-    pub fn build(mut self) -> Request {
+    pub fn build(self) -> Request {
         let headers = match self.headers {
             None => None,
             Some(header_string) => {
@@ -141,9 +141,11 @@ impl RequestCollection {
     pub fn save(&self) {
         let serialized = serde_json::to_string_pretty(&self.requests);
         info!("Serialized: {:?}", serialized);
-        let mut file = File::create("requests.json");
+        let file = File::create("requests.json");
         if let Ok(mut file) = file {
-            file.write_all(serialized.unwrap().as_bytes());
+            if let Err(err) = file.write_all(serialized.unwrap().as_bytes()) {
+                error!("Error writing file {:?}", err);
+            }
         }
     }
 
