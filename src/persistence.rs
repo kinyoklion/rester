@@ -3,12 +3,19 @@ use crate::Response::Headers;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::fs::File;
-use std::io::Write;
+use std::io::{BufReader, Write};
+use std::path::Path;
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct KeyValuePair {
     pub key: String,
     pub value: String,
+}
+
+impl KeyValuePair {
+    pub fn to_string(&self) -> String {
+        format!("{:?}:{:?}", self.key, self.value)
+    }
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -23,6 +30,18 @@ pub struct Request {
     pub headers: Option<Vec<KeyValuePair>>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub params: Option<Vec<KeyValuePair>>,
+}
+
+impl Request {
+    pub fn headers_to_string(&self) -> String {
+        match &self.headers {
+            None => "".to_string(),
+            Some(headers) => {
+                let strings: Vec<String> = headers.iter().map(|i| i.to_string()).collect();
+                strings.join("\r\n")
+            }
+        }
+    }
 }
 
 pub struct RequestBuilder {
@@ -97,7 +116,7 @@ impl RequestBuilder {
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct RequestCollection {
-    requests: Vec<Request>,
+    pub requests: Vec<Request>,
 }
 
 impl RequestCollection {
@@ -126,5 +145,27 @@ impl RequestCollection {
         if let Ok(mut file) = file {
             file.write_all(serialized.unwrap().as_bytes());
         }
+    }
+
+    pub fn load() -> Self {
+        if Path::new("requests.json").exists() {
+            match File::open("requests.json") {
+                Ok(file) => {
+                    let reader = BufReader::new(file);
+
+                    // Read the JSON contents of the file as an instance of `User`.
+                    match serde_json::from_reader(reader) {
+                        Ok(collection) => {
+                            return Self {
+                                requests: collection,
+                            };
+                        }
+                        _ => {}
+                    }
+                }
+                Err(_) => {}
+            }
+        }
+        Self::new()
     }
 }

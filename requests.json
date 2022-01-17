@@ -1,0 +1,18 @@
+[
+  {
+    "key": "nrc_all_activity",
+    "method": "GET",
+    "url": "https://api.nike.com/sport/v3/me/activity/7a0ee630-9cfe-4a09-acb8-db0b08d83bb5?metrics=ALL",
+    "headers": [
+      {
+        "key": "Authorization",
+        "value": "Bearer eyJhbGciOiJSUzI1NiIsImtpZCI6ImQ5N2ZlZmE3LWQ4NjktNDA2Yy04YjQ1LTJhODdkZGU0N2ZkZXNpZyJ9.eyJ0cnVzdCI6MTAwLCJpYXQiOjE2NDIxMzU5MjQsImV4cCI6MTY0MjEzOTUyNCwiaXNzIjoib2F1dGgyYWNjIiwianRpIjoiZjM4Mjk1OTYtNmRiNS00NDAwLTlhNzMtMGI5NDllYTBkM2U0IiwibGF0IjoxNjQyMTM1OTI0LCJhdWQiOiJjb20ubmlrZS5kaWdpdGFsIiwic3ViIjoiY29tLm5pa2UuY29tbWVyY2UubmlrZWRvdGNvbS53ZWIiLCJzYnQiOiJuaWtlOmFwcCIsInNjcCI6WyJuaWtlLmRpZ2l0YWwiXSwicHJuIjoiNGEyOTMyZDYtMjE1ZC00MGVjLWIwMTEtMGRlN2I0ZmYxNTIzIiwicHJ0IjoibmlrZTpwbHVzIn0.pGwV3lU2z0Qb8MMGkluqcGMtu58LoukuluvaqTqzfDQ8xN_2qnV6NVhnAUPnkd_b2104FVRuXQbJWMvELjDS3K-GdOFEWQFWpes0Y_JwwW4Ygj_yp_6jRVPUWTGqdBFO34dVt-M4TEYBubuH-kTihwIb7V-ksiRvIDq8o2B0tW_puYU9MmTI9uORnRxbIT-KvzF1h7nICfN2CQBSRLDeK1GvPpDnDi4S9nkZE5IFWkah3sfrnjt763CVanlvPdU6l4pdrpR4TntImNT1uiM8WsmTM5H2DoRvGG9NuF_vrhZAZYa88k3MBpWh2wcNPoOr8mdH7_ILIHdUitYG2RIsgg"
+      }
+    ]
+  },
+  {
+    "key": "google",
+    "method": "GET",
+    "url": "https://www.google.com"
+  }
+]

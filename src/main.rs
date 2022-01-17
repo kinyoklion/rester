@@ -27,7 +27,8 @@ use tokio::sync::mpsc;
 use rester::app::{App, Modal, Mode};
 use rester::ui::centered_rect;
 use rester::web_request_handler;
-use tui::widgets::Clear;
+use tui::style::Modifier;
+use tui::widgets::{Clear, List, ListItem};
 use tui::{
     backend::{Backend, CrosstermBackend},
     layout::{Alignment, Constraint, Direction, Layout},
@@ -139,43 +140,32 @@ fn ui<B: Backend>(rect: &mut Frame<B>, app: &mut App) {
         .constraints([Constraint::Percentage(50), Constraint::Percentage(50)].as_ref())
         .split(horizontal_chunks[1]);
 
-    let header_option = app.response_header_string.lock().unwrap();
-    let headers_response_string = match &(*header_option) {
-        None => "",
-        Some(string) => string.as_str(),
-    };
+    let mut header_response_paragraph = app.response_header_paragraph.lock().unwrap();
 
     let header_updates = paragraph(
         rect,
         response_chunks[1],
         "Response Headers",
-        headers_response_string,
+        header_response_paragraph.as_str(),
         app.mode == Mode::ResponseHeaders,
-        app.scroll_states.response_headers,
-        app.cache_states.response_headers.clone(),
+        header_response_paragraph.scroll,
+        header_response_paragraph.cache.clone(),
     );
 
-    app.scroll_states.response_headers = header_updates.0;
-    app.cache_states.response_headers = Some(header_updates.1);
+    header_response_paragraph.update(header_updates);
 
-    let option = app.response_string.lock().unwrap();
+    let mut response_paragraph = app.response_paragraph.lock().unwrap();
 
-    let response_string = match &(*option) {
-        None => "",
-        Some(string) => string.as_str(),
-    };
-
-    let response_updates = paragraph(
+    let res = paragraph(
         rect,
         response_chunks[0],
         "Response Body",
-        response_string,
+        response_paragraph.as_str(),
         app.mode == Mode::ResponseBody,
-        app.scroll_states.response,
-        app.cache_states.response.clone(),
+        response_paragraph.scroll,
+        response_paragraph.cache.clone(),
     );
-    app.scroll_states.response = response_updates.0;
-    app.cache_states.response = Some(response_updates.1);
+    response_paragraph.update(res);
 
     let side_chunks = Layout::default()
         .direction(Direction::Vertical)
@@ -227,7 +217,7 @@ fn ui<B: Backend>(rect: &mut Frame<B>, app: &mut App) {
         rect,
         chunks[0],
         "URL",
-        app.url.as_ref(),
+        app.url.as_str(),
         app.mode == Mode::Url,
         0,
         Color::LightCyan,
@@ -244,6 +234,33 @@ fn ui<B: Backend>(rect: &mut Frame<B>, app: &mut App) {
                 .title("Copyright")
                 .border_type(BorderType::Plain),
         );
+
+    if app.modal == Modal::Requests {
+        let block = Block::default().style(Style::default().bg(Color::Blue));
+        rect.render_widget(block.clone(), chunks[1]);
+        rect.render_widget(block.clone(), chunks[0]);
+        rect.render_widget(block, chunks[2]);
+
+        let area = centered_rect(60, 60, size);
+        rect.render_widget(Clear, area);
+
+        let items: Vec<ListItem> = app
+            .request_collection
+            .requests
+            .iter()
+            .map(|i| ListItem::new(i.key.as_str()))
+            .collect();
+        let items = List::new(items)
+            .block(Block::default().borders(Borders::ALL).title("Requests"))
+            .highlight_style(
+                Style::default()
+                    .bg(Color::LightGreen)
+                    .add_modifier(Modifier::BOLD),
+            )
+            .highlight_symbol(">> ");
+
+        rect.render_stateful_widget(items, area, &mut app.request_selection_state);
+    }
 
     if app.modal == Modal::Save {
         let block = Block::default().style(Style::default().bg(Color::Blue));

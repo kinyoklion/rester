@@ -7,6 +7,7 @@ use tokio::sync::mpsc;
 extern crate log;
 
 pub mod app;
+pub mod paragraph_with_state;
 pub mod persistence;
 pub mod ui;
 pub mod web_request_handler;
@@ -32,4 +33,10 @@ pub struct Request {
     pub url: String,
     pub headers: String,
     pub resp: Responder<Response>,
+}
+
+#[derive(Debug)]
+pub enum ScrollDirection {
+    Up,
+    Down,
 }

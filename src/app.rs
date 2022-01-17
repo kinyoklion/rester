@@ -1,6 +1,7 @@
+use crate::paragraph_with_state::ParagraphWithState;
 use crate::persistence::RequestCollection;
 use crate::ui::paragraph::WrappedCache;
-use crate::{Method, Request, Response};
+use crate::{Method, Request, Response, ScrollDirection};
 use bytes::Bytes;
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 use reqwest::RequestBuilder;
@@ -8,6 +9,7 @@ use std::rc::Rc;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 use tokio::sync::mpsc;
+use tui::widgets::ListState;
 
 #[derive(Copy, Clone, PartialEq, Debug)]
 pub enum Mode {
@@ -22,66 +24,51 @@ pub enum Mode {
 #[derive(Copy, Clone, PartialEq, Debug)]
 pub enum Modal {
     Save,
+    Requests,
     None,
-}
-
-#[derive(Debug)]
-pub enum ScrollDirection {
-    Up,
-    Down,
-}
-
-pub struct ScrollStates {
-    pub response: u16,
-    pub response_headers: u16,
-}
-
-pub struct CacheStates {
-    pub response: Option<Rc<WrappedCache>>,
-    pub response_headers: Option<Rc<WrappedCache>>,
 }
 
 /// App holds the state of the application
 pub struct App {
-    pub url: String,
+    pub url: ParagraphWithState,
     pub mode: Mode,
     pub method: Method,
     pub headers: String,
     pub sender: mpsc::Sender<Request>,
     pub response: Arc<Mutex<Option<Bytes>>>,
-    pub response_string: Arc<Mutex<Option<String>>>,
-    pub response_header_string: Arc<Mutex<Option<String>>>,
-    pub scroll_states: ScrollStates,
-    pub cache_states: CacheStates,
+    pub response_paragraph: Arc<Mutex<ParagraphWithState>>,
+    pub response_header_paragraph: Arc<Mutex<ParagraphWithState>>,
     pub dirty: Arc<AtomicBool>,
     pub modal: Modal,
     pub request_name: String,
-    request_collection: RequestCollection,
+    pub request_collection: RequestCollection,
+    pub request_selection_state: ListState,
 }
 
 impl App {
     pub fn new(sender: mpsc::Sender<Request>) -> Self {
         App {
-            url: String::new(),
+            url: ParagraphWithState::new("".to_string(), false, true),
             headers: String::new(),
             mode: Mode::Url,
             method: Method::GET,
             sender,
             response: Arc::new(Mutex::new(None)),
-            response_string: Arc::new(Mutex::new(None)),
-            scroll_states: ScrollStates {
-                response: 0,
-                response_headers: 0,
-            },
-            cache_states: CacheStates {
-                response: None,
-                response_headers: None,
-            },
+            response_paragraph: Arc::new(Mutex::new(ParagraphWithState::new(
+                "".to_string(),
+                true,
+                false,
+            ))),
             dirty: Arc::new(AtomicBool::new(false)),
-            response_header_string: Arc::new(Mutex::new(None)),
+            response_header_paragraph: Arc::new(Mutex::new(ParagraphWithState::new(
+                "".to_string(),
+                true,
+                false,
+            ))),
             modal: Modal::None,
             request_name: "".to_string(),
-            request_collection: RequestCollection::new(),
+            request_collection: RequestCollection::load(),
+            request_selection_state: ListState::default(),
         }
     }
 }
@@ -114,6 +101,22 @@ impl App {
         }
     }
 
+    fn list_next(size: usize, current: usize) -> usize {
+        if current >= size - 1 {
+            0
+        } else {
+            current + 1
+        }
+    }
+
+    fn list_previous(size: usize, current: usize) -> usize {
+        if current == 0 {
+            size - 1
+        } else {
+            current - 1
+        }
+    }
+
     pub fn handle_input(&mut self, key: KeyEvent) -> bool {
         if key.modifiers.contains(KeyModifiers::CONTROL) {
             match key.code {
@@ -121,6 +124,12 @@ impl App {
                     's' => {
                         if self.modal == Modal::None {
                             self.modal = Modal::Save;
+                        }
+                    }
+                    'r' => {
+                        if self.modal == Modal::None {
+                            self.modal = Modal::Requests;
+                            self.request_selection_state.select(Some(0));
                         }
                     }
                     _ => {}
@@ -146,11 +155,12 @@ impl App {
             }
             code => match self.modal {
                 Modal::Save => self.handle_save_input(code),
+                Modal::Requests => self.handle_request_input(code),
                 Modal::None => match self.mode {
-                    Mode::Url => self.handle_url_input(code),
+                    Mode::Url => self.handle_url_input(key),
                     Mode::RequestHeaders => self.handle_headers_input(code),
-                    Mode::ResponseBody => self.handle_response_input(code),
-                    Mode::ResponseHeaders => self.handle_response_headers_input(code),
+                    Mode::ResponseBody => self.handle_response_input(key),
+                    Mode::ResponseHeaders => self.handle_response_headers_input(key),
                     _ => {}
                 },
             },
@@ -185,19 +195,41 @@ impl App {
         };
     }
 
-    fn handle_url_input(&mut self, code: KeyCode) {
+    fn handle_request_input(&mut self, code: KeyCode) {
         match code {
             KeyCode::Enter => {
-                self.make_request();
+                let index = self.request_selection_state.selected().unwrap_or(0);
+
+                self.reset();
+                let request = &self.request_collection.requests[index];
+
+                self.url.set_value(request.url.clone());
+                self.method = request.method;
+                self.request_name = request.key.clone();
+                self.headers = request.headers_to_string();
+
+                self.modal = Modal::None;
             }
-            KeyCode::Char(c) => {
-                self.url.push(c);
-            }
-            KeyCode::Backspace => {
-                self.url.pop();
-            }
+            KeyCode::Up => self
+                .request_selection_state
+                .select(Some(Self::list_previous(
+                    self.request_collection.requests.len(),
+                    self.request_selection_state.selected().unwrap_or(0),
+                ))),
+            KeyCode::Down => self.request_selection_state.select(Some(Self::list_next(
+                self.request_collection.requests.len(),
+                self.request_selection_state.selected().unwrap_or(0),
+            ))),
             _ => {}
         };
+    }
+
+    fn handle_url_input(&mut self, event: KeyEvent) {
+        if event.code == KeyCode::Enter {
+            self.make_request();
+            return;
+        }
+        self.url.handle_input(event)
     }
 
     fn handle_headers_input(&mut self, code: KeyCode) {
@@ -218,53 +250,20 @@ impl App {
         };
     }
 
-    fn scroll(&mut self, direction: ScrollDirection) {
-        match self.mode {
-            Mode::ResponseBody => match direction {
-                ScrollDirection::Up => {
-                    if self.scroll_states.response != 0 {
-                        self.scroll_states.response -= 1;
-                    }
-                }
-                ScrollDirection::Down => {
-                    self.scroll_states.response += 1;
-                }
-            },
-            Mode::ResponseHeaders => match direction {
-                ScrollDirection::Up => {
-                    if self.scroll_states.response_headers != 0 {
-                        self.scroll_states.response_headers -= 1;
-                    }
-                }
-                ScrollDirection::Down => {
-                    self.scroll_states.response_headers += 1;
-                }
-            },
-            _ => {}
-        };
+    fn handle_response_input(&mut self, event: KeyEvent) {
+        self.response_paragraph.lock().unwrap().handle_input(event);
     }
 
-    fn handle_response_input(&mut self, code: KeyCode) {
-        match code {
-            KeyCode::Up => self.scroll(ScrollDirection::Up),
-            KeyCode::Down => self.scroll(ScrollDirection::Down),
-            _ => {}
-        };
-    }
-
-    fn handle_response_headers_input(&mut self, code: KeyCode) {
-        match code {
-            KeyCode::Up => self.scroll(ScrollDirection::Up),
-            KeyCode::Down => self.scroll(ScrollDirection::Down),
-            _ => {}
-        };
+    fn handle_response_headers_input(&mut self, event: KeyEvent) {
+        self.response_header_paragraph
+            .lock()
+            .unwrap()
+            .handle_input(event);
     }
 
     fn reset(&mut self) {
-        self.scroll_states.response = 0;
-        self.scroll_states.response_headers = 0;
-        *self.response_string.lock().unwrap() = None;
-        *self.response_header_string.lock().unwrap() = None;
+        self.response_paragraph.lock().unwrap().reset();
+        self.response_header_paragraph.lock().unwrap().reset();
         *self.response.lock().unwrap() = None;
     }
 
@@ -272,12 +271,12 @@ impl App {
         self.reset();
         let sender = self.sender.clone();
         let method = self.method;
-        let url = self.url.clone();
+        let url = String::from(self.url.as_str());
         let response = self.response.clone();
-        let res_string = self.response_string.clone();
+        let res_paragraph = self.response_paragraph.clone();
         let headers = self.headers.clone();
         let dirty = self.dirty.clone();
-        let response_header_string = self.response_header_string.clone();
+        let response_header_paragraph = self.response_header_paragraph.clone();
 
         tokio::spawn(async move {
             let (tx, mut rx) = mpsc::channel(10);
@@ -298,14 +297,14 @@ impl App {
                     Some(Response::Headers(res)) => {
                         let header_string = jsonxf::pretty_print(format!("{:?}", res).as_str());
                         if let Ok(header_string) = header_string {
-                            let mut response_header = response_header_string.lock().unwrap();
-                            *response_header = Some(header_string);
+                            response_header_paragraph
+                                .lock()
+                                .unwrap()
+                                .set_value(header_string);
                         }
                     }
                     Some(Response::Body(res)) => {
                         let mut response_bytes = response.lock().unwrap();
-
-                        let mut response_string = res_string.lock().unwrap();
 
                         let decoded_string = String::from_utf8_lossy(&res);
                         let pretty_json = jsonxf::pretty_print(decoded_string.to_string().as_str());
@@ -317,7 +316,7 @@ impl App {
                         };
 
                         *response_bytes = Some(res);
-                        *response_string = Some(final_string);
+                        res_paragraph.lock().unwrap().set_value(final_string);
                         dirty.store(true, Ordering::SeqCst);
                     }
                     _ => {

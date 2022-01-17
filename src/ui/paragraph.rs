@@ -1,4 +1,5 @@
 use std::rc::Rc;
+use std::sync::Arc;
 
 use tui::backend::Backend;
 use tui::layout::{Alignment, Rect};
@@ -24,8 +25,8 @@ pub fn paragraph<B: Backend>(
     text: &str,
     active: bool,
     scroll: u16,
-    cache: Option<Rc<WrappedCache>>,
-) -> (u16, Rc<WrappedCache>) {
+    cache: Option<Arc<WrappedCache>>,
+) -> (u16, Arc<WrappedCache>) {
     paragraph_color(
         app_rect,
         rect,
@@ -46,8 +47,8 @@ pub fn paragraph_color<B: Backend>(
     active: bool,
     scroll: u16,
     color: Color,
-    cache: Option<Rc<WrappedCache>>,
-) -> (u16, Rc<WrappedCache>) {
+    cache: Option<Arc<WrappedCache>>,
+) -> (u16, Arc<WrappedCache>) {
     let block = Block::default()
         .borders(Borders::ALL)
         .style(Style::default().fg(Color::White))
@@ -93,7 +94,7 @@ pub fn paragraph_color<B: Backend>(
     (capped_scroll, cur_cache)
 }
 
-fn make_cache(text: &str, inner_rect: Rect) -> Rc<WrappedCache> {
+fn make_cache(text: &str, inner_rect: Rect) -> Arc<WrappedCache> {
     let wrapped = textwrap::fill(text, inner_rect.width as usize);
     let lines = count_newlines(wrapped.as_str());
 
@@ -103,5 +104,5 @@ fn make_cache(text: &str, inner_rect: Rect) -> Rc<WrappedCache> {
         wrapped,
         lines,
     };
-    Rc::new(cache)
+    Arc::new(cache)
 }
