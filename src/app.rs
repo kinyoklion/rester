@@ -5,6 +5,7 @@ use crate::{Method, Request, Response};
 use bytes::Bytes;
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 
+use crate::ui::text_area::{EditCommand, EditState};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 use tokio::sync::mpsc;
@@ -32,7 +33,7 @@ pub struct App {
     pub url: ParagraphWithState,
     pub mode: Mode,
     pub method: Method,
-    pub headers: ParagraphWithState,
+    pub headers: EditState,
     pub sender: mpsc::Sender<Request>,
     pub response: Arc<Mutex<Option<Bytes>>>,
     pub response_paragraph: Arc<Mutex<ParagraphWithState>>,
@@ -48,7 +49,7 @@ impl App {
     pub fn new(sender: mpsc::Sender<Request>) -> Self {
         App {
             url: ParagraphWithState::new("".to_string(), false, true),
-            headers: ParagraphWithState::new("".to_string(), true, true),
+            headers: EditState::new(""),
             mode: Mode::Url,
             method: Method::GET,
             sender,
@@ -161,7 +162,27 @@ impl App {
             Modal::Requests => self.handle_request_input(key),
             Modal::None => match self.mode {
                 Mode::Url => self.handle_url_input(key),
-                Mode::RequestHeaders => self.headers.handle_input(key),
+                Mode::RequestHeaders => {
+                    match key.code {
+                        KeyCode::Right => self.headers.handle_command(EditCommand::ForwardCursor),
+                        KeyCode::Left => self.headers.handle_command(EditCommand::BackwardCursor),
+                        KeyCode::Backspace => {
+                            self.headers.handle_command(EditCommand::BackwardDelete)
+                        }
+                        KeyCode::Delete => self.headers.handle_command(EditCommand::ForwardDelete),
+                        KeyCode::Char(c) => {
+                            self.headers.handle_command(EditCommand::InsertCharacter(c))
+                        }
+                        KeyCode::Enter => {
+                            // self.edit.handle_command(EditCommand::InsertCharacter('\r'));
+                            self.headers
+                                .handle_command(EditCommand::InsertCharacter('\n'));
+                        }
+                        KeyCode::Up => self.headers.handle_command(EditCommand::UpCursor),
+                        KeyCode::Down => self.headers.handle_command(EditCommand::DownCursor),
+                        _ => {}
+                    };
+                }
                 Mode::ResponseBody => self.response_paragraph.lock().unwrap().handle_input(key),
                 Mode::ResponseHeaders => self
                     .response_header_paragraph

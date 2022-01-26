@@ -26,6 +26,7 @@ use tokio::sync::mpsc;
 
 use rester::app::{App, Modal, Mode};
 use rester::ui::centered_rect;
+use rester::ui::text_area::render_edit;
 use rester::web_request_handler;
 use tui::style::Modifier;
 use tui::widgets::{Clear, List, ListItem};
@@ -201,18 +202,33 @@ fn ui<B: Backend>(rect: &mut Frame<B>, app: &mut App) {
         });
     rect.render_widget(params, side_chunks[1]);
 
-    let header_res = paragraph_color(
-        rect,
-        side_chunks[2],
-        "Headers",
-        app.headers.as_str(),
-        app.mode == Mode::RequestHeaders,
-        app.headers.scroll,
-        Color::LightCyan,
-        app.headers.cache.clone(),
-    );
+    let block = Block::default()
+        .borders(Borders::ALL)
+        .style(Style::default().fg(Color::White))
+        .title("Headers")
+        .border_type(if app.mode == Mode::RequestHeaders {
+            BorderType::Double
+        } else {
+            BorderType::Plain
+        });
 
-    app.headers.update(header_res);
+    let inner = block.inner(side_chunks[2]);
+    rect.render_widget(block, side_chunks[2]);
+
+    render_edit(rect, inner, &app.headers);
+
+    // let header_res = paragraph_color(
+    //     rect,
+    //     side_chunks[2],
+    //     "Headers",
+    //     app.headers.as_str(),
+    //     app.mode == Mode::RequestHeaders,
+    //     app.headers.scroll,
+    //     Color::LightCyan,
+    //     app.headers.cache.clone(),
+    // );
+    //
+    // app.headers.update(header_res);
 
     paragraph_color(
         rect,

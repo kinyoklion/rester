@@ -1,6 +1,8 @@
 use tui::layout::{Constraint, Direction, Layout, Rect};
 
+mod cursor;
 pub mod paragraph;
+pub mod text_area;
 
 pub fn count_newlines(s: &str) -> u16 {
     s.as_bytes().iter().filter(|&&c| c == b'\n').count() as u16
