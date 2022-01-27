@@ -72,15 +72,15 @@ impl<'a> StatefulWidget for TextArea<'a> {
             return;
         }
 
-        let (row, before, pos_in_row) = count_newlines(state.buffer.as_str(), state.pos as u16);
+        let (row, before, pos_in_row) = count_newlines(state.buffer.as_str(), state.pos);
         let mut y_scroll = 0;
         let mut x_scroll = 0;
 
-        if row > (text_area.height - 1) {
+        if row > (text_area.height as usize - 1) {
             y_scroll = ((text_area.height - 1) as i32 - row as i32).abs() as u16
         }
 
-        if pos_in_row > (text_area.width - 1) {
+        if pos_in_row > (text_area.width as usize - 1) {
             x_scroll = ((text_area.width - 1) as i32 - pos_in_row as i32).abs() as u16
         }
 
@@ -91,7 +91,7 @@ impl<'a> StatefulWidget for TextArea<'a> {
         paragraph.render(text_area, buf);
         if self.active {
             let cursor = Cursor::default()
-                .position(state.pos as u16 - before, row)
+                .position((state.pos - before) as u16, row as u16)
                 .scroll(y_scroll, x_scroll);
 
             cursor.render(text_area, buf);
@@ -134,7 +134,7 @@ pub fn row_topology(s: &str, pos: usize) -> (Vec<Row>, usize) {
     (topology, current_row)
 }
 
-pub fn count_newlines(s: &str, pos: u16) -> (u16, u16, u16) {
+pub fn count_newlines(s: &str, pos: usize) -> (usize, usize, usize) {
     let mut count = 0;
     let mut bytes_before = 0;
     let mut bytes_line = 0;
