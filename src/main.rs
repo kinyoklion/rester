@@ -26,7 +26,7 @@ use tokio::sync::mpsc;
 
 use rester::app::{App, Modal, Mode};
 use rester::ui::centered_rect;
-use rester::ui::text_area::render_edit;
+use rester::ui::text_area::{TextArea};
 use rester::web_request_handler;
 use tui::style::Modifier;
 use tui::widgets::{Clear, List, ListItem};
@@ -212,23 +212,7 @@ fn ui<B: Backend>(rect: &mut Frame<B>, app: &mut App) {
             BorderType::Plain
         });
 
-    let inner = block.inner(side_chunks[2]);
-    rect.render_widget(block, side_chunks[2]);
-
-    render_edit(rect, inner, &app.headers);
-
-    // let header_res = paragraph_color(
-    //     rect,
-    //     side_chunks[2],
-    //     "Headers",
-    //     app.headers.as_str(),
-    //     app.mode == Mode::RequestHeaders,
-    //     app.headers.scroll,
-    //     Color::LightCyan,
-    //     app.headers.cache.clone(),
-    // );
-    //
-    // app.headers.update(header_res);
+    rect.render_stateful_widget(TextArea::default().block(block), side_chunks[2], &mut app.headers);
 
     paragraph_color(
         rect,

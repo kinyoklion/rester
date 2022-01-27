@@ -1,18 +1,8 @@
-// use core::unicode::conversions::to_lower;
 use crate::ui::cursor::Cursor;
-use crossterm::cursor::{
-    DisableBlinking, EnableBlinking, MoveTo, RestorePosition, SavePosition, Show,
-};
-use crossterm::ExecutableCommand;
-use log::info;
-use std::cmp::min;
-use std::io::{stdout, Write};
-use tui::backend::Backend;
 use tui::buffer::Buffer;
 use tui::layout::Rect;
-use tui::style::{Color, Style};
-use tui::widgets::{Block, BorderType, Borders, Paragraph, Widget};
-use tui::Frame;
+use tui::style::{Style};
+use tui::widgets::{Block, Paragraph, Widget, StatefulWidget};
 
 pub struct EditState {
     buffer: String,
@@ -33,6 +23,70 @@ pub struct Row {
     start: usize,
     end: usize,
     size: usize,
+}
+
+#[derive(Default, Clone)]
+pub struct TextArea<'a> {
+    /// A block to wrap the widget in
+    block: Option<Block<'a>>,
+    /// Widget style
+    style: Style,
+}
+
+impl<'a> TextArea<'a> {
+    pub fn block(mut self, block: Block<'a>) -> TextArea<'a> {
+        self.block = Some(block);
+        self
+    }
+
+    pub fn style(mut self, style: Style) -> TextArea<'a> {
+        self.style = style;
+        self
+    }
+}
+
+impl<'a> StatefulWidget for TextArea<'a> {
+    type State = EditState;
+
+    fn render(mut self, area: Rect, buf: &mut Buffer, state: &mut Self::State) {
+        buf.set_style(area, self.style);
+
+        let text_area = match self.block.take() {
+            Some(b) => {
+                let inner_area = b.inner(area);
+                b.render(area, buf);
+                inner_area
+            }
+            None => area,
+        };
+
+        // Don't bother rendering if there isn't enough size.
+        if text_area.height < 1 || text_area.width < 1 {
+            return;
+        }
+
+        let (row, before, pos_in_row) = count_newlines(state.buffer.as_str(), state.pos as u16);
+        let mut y_scroll = 0;
+        let mut x_scroll = 0;
+
+        if row > (text_area.height - 1) {
+            y_scroll = ((text_area.height - 1) as i32 - row as i32).abs() as u16
+        }
+
+        if pos_in_row > (text_area.width - 1) {
+            x_scroll = ((text_area.width - 1) as i32 - pos_in_row as i32).abs() as u16
+        }
+
+        let paragraph = Paragraph::new(state.buffer.as_str())
+            // .block(block)
+            .scroll((y_scroll, x_scroll));
+        let cursor = Cursor::default()
+            .position(state.pos as u16 - before, row)
+            .scroll(y_scroll, x_scroll);
+
+        paragraph.render(text_area, buf);
+        cursor.render(text_area, buf);
+    }
 }
 
 pub fn row_topology(s: &str, pos: usize) -> (Vec<Row>, usize) {
@@ -173,43 +227,5 @@ impl EditState {
 
     pub fn set_value(&mut self, value: String) {
         self.buffer = value;
-    }
-}
-
-pub fn render_edit<B: Backend>(rect: &mut Frame<B>, area: Rect, state: &EditState) {
-    // Don't bother rendering if there isn't enough size.
-    if area.height < 1 || area.width < 1 {
-        return;
-    }
-
-    let (row, before, pos_in_row) = count_newlines(state.buffer.as_str(), state.pos as u16);
-    let mut y_scroll = 0;
-    let mut x_scroll = 0;
-
-    if row > (area.height - 1) {
-        y_scroll = ((area.height - 1) as i32 - row as i32).abs() as u16
-    }
-    info!("inner x,y {:?},{:?}", area.x, area.y);
-    if pos_in_row > (area.width - 1) {
-        x_scroll = ((area.width - 1) as i32 - pos_in_row as i32).abs() as u16
-    }
-
-    let paragraph = Paragraph::new(state.buffer.as_str())
-        // .block(block)
-        .scroll((y_scroll, x_scroll));
-    let cursor = Cursor::default()
-        .position(state.pos as u16 - before, row)
-        .scroll(y_scroll, x_scroll);
-
-    rect.render_widget(paragraph, area);
-    rect.render_widget(cursor, area);
-}
-
-#[cfg(test)]
-mod tests {
-    #[test]
-    fn it_works() {
-        let result = 2 + 2;
-        assert_eq!(result, 4);
     }
 }
