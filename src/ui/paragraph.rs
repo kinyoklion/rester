@@ -6,6 +6,7 @@ use tui::layout::{Alignment, Rect};
 use tui::style::{Color, Style};
 use tui::widgets::{Block, BorderType, Borders, Paragraph};
 use tui::Frame;
+use crate::layout::block::block;
 
 pub struct WrappedCache {
     id: usize,
@@ -51,15 +52,7 @@ pub fn paragraph_color<B: Backend>(
     color: Color,
     cache: Option<Arc<WrappedCache>>,
 ) -> (u16, Arc<WrappedCache>) {
-    let block = Block::default()
-        .borders(Borders::ALL)
-        .style(Style::default().fg(Color::White))
-        .title(title)
-        .border_type(if active {
-            BorderType::Double
-        } else {
-            BorderType::Plain
-        });
+    let block = block(title, active);
     let inner_rect = block.inner(rect);
 
     let cur_cache = match cache {
@@ -89,7 +82,6 @@ pub fn paragraph_color<B: Backend>(
         .alignment(Alignment::Left)
         .style(Style::default().fg(Color::LightCyan))
         .style(Style::default().fg(color))
-        // .wrap(Wrap { trim: false })
         .scroll((capped_scroll, 0))
         .block(block);
     app_rect.render_widget(response_body, rect);

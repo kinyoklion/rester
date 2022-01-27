@@ -37,6 +37,7 @@ use tui::{
     widgets::{Block, BorderType, Borders, Paragraph},
     Frame, Terminal,
 };
+use rester::layout::block::block;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -223,40 +224,18 @@ fn ui<B: Backend>(rect: &mut Frame<B>, app: &mut App) {
     rect.render_stateful_widget(
         TextArea::default()
             .block(
-                Block::default()
-                    .borders(Borders::ALL)
-                    .style(Style::default().fg(Color::White))
-                    .title("Url")
-                    .border_type(if app.mode == Mode::Url {
-                        BorderType::Double
-                    } else {
-                        BorderType::Plain
-                    }),
+                block("Url", app.mode == Mode::Url)
             )
             .active(app.mode == Mode::Url),
         chunks[0],
         &mut app.url,
     );
-    // paragraph_color(
-    //     rect,
-    //     chunks[0],
-    //     "URL",
-    //     app.url.as_str(),
-    //     app.mode == Mode::Url,
-    //     0,
-    //     Color::LightCyan,
-    //     None,
-    // );
 
     let copyright = Paragraph::new("Ryan Lamb 2022")
         .style(Style::default().fg(Color::LightCyan))
         .alignment(Alignment::Center)
         .block(
-            Block::default()
-                .borders(Borders::ALL)
-                .style(Style::default().fg(Color::White))
-                .title("Copyright")
-                .border_type(BorderType::Plain),
+            block("Status", false)
         );
 
     if app.modal == Modal::Requests {
