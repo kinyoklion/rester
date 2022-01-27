@@ -4,7 +4,7 @@ use crate::ui::count_newlines;
 use tui::backend::Backend;
 use tui::layout::{Alignment, Rect};
 use tui::style::{Color, Style};
-use tui::widgets::{Block, BorderType, Borders, Paragraph};
+use tui::widgets::{Paragraph};
 use tui::Frame;
 use crate::layout::block::block;
 

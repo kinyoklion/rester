@@ -236,6 +236,7 @@ impl EditState {
     }
 
     pub fn set_value(&mut self, value: String) {
+        self.pos = value.len();
         self.buffer = value;
     }
 }
