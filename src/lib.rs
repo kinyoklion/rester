@@ -11,6 +11,7 @@ pub mod paragraph_with_state;
 pub mod persistence;
 pub mod ui;
 pub mod web_request_handler;
+pub mod layout;
 
 pub type Responder<T> = mpsc::Sender<T>;
 

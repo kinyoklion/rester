@@ -220,16 +220,33 @@ fn ui<B: Backend>(rect: &mut Frame<B>, app: &mut App) {
         &mut app.headers,
     );
 
-    paragraph_color(
-        rect,
+    rect.render_stateful_widget(
+        TextArea::default()
+            .block(
+                Block::default()
+                    .borders(Borders::ALL)
+                    .style(Style::default().fg(Color::White))
+                    .title("Url")
+                    .border_type(if app.mode == Mode::Url {
+                        BorderType::Double
+                    } else {
+                        BorderType::Plain
+                    }),
+            )
+            .active(app.mode == Mode::Url),
         chunks[0],
-        "URL",
-        app.url.as_str(),
-        app.mode == Mode::Url,
-        0,
-        Color::LightCyan,
-        None,
+        &mut app.url,
     );
+    // paragraph_color(
+    //     rect,
+    //     chunks[0],
+    //     "URL",
+    //     app.url.as_str(),
+    //     app.mode == Mode::Url,
+    //     0,
+    //     Color::LightCyan,
+    //     None,
+    // );
 
     let copyright = Paragraph::new("Ryan Lamb 2022")
         .style(Style::default().fg(Color::LightCyan))

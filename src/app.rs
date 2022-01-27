@@ -30,7 +30,7 @@ pub enum Modal {
 
 /// App holds the state of the application
 pub struct App {
-    pub url: ParagraphWithState,
+    pub url: EditState,
     pub mode: Mode,
     pub method: Method,
     pub headers: EditState,
@@ -48,7 +48,7 @@ pub struct App {
 impl App {
     pub fn new(sender: mpsc::Sender<Request>) -> Self {
         App {
-            url: ParagraphWithState::new("".to_string(), false, true),
+            url: EditState::new(""),
             headers: EditState::new(""),
             mode: Mode::Url,
             method: Method::GET,
@@ -268,7 +268,18 @@ impl App {
             self.make_request();
             return;
         }
-        self.url.handle_input(event)
+        match event.code {
+            KeyCode::Right => self.url.handle_command(EditCommand::ForwardCursor),
+            KeyCode::Left => self.url.handle_command(EditCommand::BackwardCursor),
+            KeyCode::Backspace => {
+                self.url.handle_command(EditCommand::BackwardDelete)
+            }
+            KeyCode::Delete => self.url.handle_command(EditCommand::ForwardDelete),
+            KeyCode::Char(c) => {
+                self.url.handle_command(EditCommand::InsertCharacter(c))
+            }
+            _ => {}
+        };
     }
 
     fn reset(&mut self) {
