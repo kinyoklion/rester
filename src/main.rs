@@ -231,7 +231,7 @@ fn ui<B: Backend>(rect: &mut Frame<B>, app: &mut App) {
         &mut app.url,
     );
 
-    let copyright = Paragraph::new("Ryan Lamb 2022")
+    let copyright = Paragraph::new("")
         .style(Style::default().fg(Color::LightCyan))
         .alignment(Alignment::Center)
         .block(

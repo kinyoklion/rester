@@ -162,27 +162,7 @@ impl App {
             Modal::Requests => self.handle_request_input(key),
             Modal::None => match self.mode {
                 Mode::Url => self.handle_url_input(key),
-                Mode::RequestHeaders => {
-                    match key.code {
-                        KeyCode::Right => self.headers.handle_command(EditCommand::ForwardCursor),
-                        KeyCode::Left => self.headers.handle_command(EditCommand::BackwardCursor),
-                        KeyCode::Backspace => {
-                            self.headers.handle_command(EditCommand::BackwardDelete)
-                        }
-                        KeyCode::Delete => self.headers.handle_command(EditCommand::ForwardDelete),
-                        KeyCode::Char(c) => {
-                            self.headers.handle_command(EditCommand::InsertCharacter(c))
-                        }
-                        KeyCode::Enter => {
-                            // self.edit.handle_command(EditCommand::InsertCharacter('\r'));
-                            self.headers
-                                .handle_command(EditCommand::InsertCharacter('\n'));
-                        }
-                        KeyCode::Up => self.headers.handle_command(EditCommand::UpCursor),
-                        KeyCode::Down => self.headers.handle_command(EditCommand::DownCursor),
-                        _ => {}
-                    };
-                }
+                Mode::RequestHeaders => self.handle_request_headers_input(key),
                 Mode::ResponseBody => self.response_paragraph.lock().unwrap().handle_input(key),
                 Mode::ResponseHeaders => self
                     .response_header_paragraph
@@ -278,6 +258,27 @@ impl App {
             KeyCode::Char(c) => {
                 self.url.handle_command(EditCommand::InsertCharacter(c))
             }
+            _ => {}
+        };
+    }
+
+    fn handle_request_headers_input(&mut self, event: KeyEvent) {
+        match event.code {
+            KeyCode::Right => self.headers.handle_command(EditCommand::ForwardCursor),
+            KeyCode::Left => self.headers.handle_command(EditCommand::BackwardCursor),
+            KeyCode::Backspace => {
+                self.headers.handle_command(EditCommand::BackwardDelete)
+            }
+            KeyCode::Delete => self.headers.handle_command(EditCommand::ForwardDelete),
+            KeyCode::Char(c) => {
+                self.headers.handle_command(EditCommand::InsertCharacter(c))
+            }
+            KeyCode::Enter => {
+                self.headers
+                    .handle_command(EditCommand::InsertCharacter('\n'));
+            }
+            KeyCode::Up => self.headers.handle_command(EditCommand::UpCursor),
+            KeyCode::Down => self.headers.handle_command(EditCommand::DownCursor),
             _ => {}
         };
     }
