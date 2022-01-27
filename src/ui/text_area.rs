@@ -1,8 +1,8 @@
 use crate::ui::cursor::Cursor;
 use tui::buffer::Buffer;
 use tui::layout::Rect;
-use tui::style::{Style};
-use tui::widgets::{Block, Paragraph, Widget, StatefulWidget};
+use tui::style::Style;
+use tui::widgets::{Block, Paragraph, StatefulWidget, Widget};
 
 pub struct EditState {
     buffer: String,
@@ -31,6 +31,8 @@ pub struct TextArea<'a> {
     block: Option<Block<'a>>,
     /// Widget style
     style: Style,
+    /// Flag indicating if this component should render as active.
+    active: bool,
 }
 
 impl<'a> TextArea<'a> {
@@ -41,6 +43,11 @@ impl<'a> TextArea<'a> {
 
     pub fn style(mut self, style: Style) -> TextArea<'a> {
         self.style = style;
+        self
+    }
+
+    pub fn active(mut self, active: bool) -> TextArea<'a> {
+        self.active = active;
         self
     }
 }
@@ -80,12 +87,15 @@ impl<'a> StatefulWidget for TextArea<'a> {
         let paragraph = Paragraph::new(state.buffer.as_str())
             // .block(block)
             .scroll((y_scroll, x_scroll));
-        let cursor = Cursor::default()
-            .position(state.pos as u16 - before, row)
-            .scroll(y_scroll, x_scroll);
 
         paragraph.render(text_area, buf);
-        cursor.render(text_area, buf);
+        if self.active {
+            let cursor = Cursor::default()
+                .position(state.pos as u16 - before, row)
+                .scroll(y_scroll, x_scroll);
+
+            cursor.render(text_area, buf);
+        }
     }
 }
 

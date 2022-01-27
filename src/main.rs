@@ -26,7 +26,7 @@ use tokio::sync::mpsc;
 
 use rester::app::{App, Modal, Mode};
 use rester::ui::centered_rect;
-use rester::ui::text_area::{TextArea};
+use rester::ui::text_area::TextArea;
 use rester::web_request_handler;
 use tui::style::Modifier;
 use tui::widgets::{Clear, List, ListItem};
@@ -202,17 +202,23 @@ fn ui<B: Backend>(rect: &mut Frame<B>, app: &mut App) {
         });
     rect.render_widget(params, side_chunks[1]);
 
-    let block = Block::default()
-        .borders(Borders::ALL)
-        .style(Style::default().fg(Color::White))
-        .title("Headers")
-        .border_type(if app.mode == Mode::RequestHeaders {
-            BorderType::Double
-        } else {
-            BorderType::Plain
-        });
-
-    rect.render_stateful_widget(TextArea::default().block(block), side_chunks[2], &mut app.headers);
+    rect.render_stateful_widget(
+        TextArea::default()
+            .block(
+                Block::default()
+                    .borders(Borders::ALL)
+                    .style(Style::default().fg(Color::White))
+                    .title("Headers")
+                    .border_type(if app.mode == Mode::RequestHeaders {
+                        BorderType::Double
+                    } else {
+                        BorderType::Plain
+                    }),
+            )
+            .active(app.mode == Mode::RequestHeaders),
+        side_chunks[2],
+        &mut app.headers,
+    );
 
     paragraph_color(
         rect,
