@@ -7,11 +7,11 @@ use tokio::sync::mpsc;
 extern crate log;
 
 pub mod app;
+pub mod layout;
 pub mod paragraph_with_state;
 pub mod persistence;
 pub mod ui;
 pub mod web_request_handler;
-pub mod layout;
 
 pub type Responder<T> = mpsc::Sender<T>;
 
@@ -19,6 +19,9 @@ pub type Responder<T> = mpsc::Sender<T>;
 pub enum Method {
     GET,
     POST,
+    PUT,
+    DELETE,
+    PATCH,
 }
 
 #[derive(Debug)]
@@ -33,6 +36,7 @@ pub struct Request {
     pub method: Method,
     pub url: String,
     pub headers: String,
+    pub body: String,
     pub resp: Responder<Response>,
 }
 

@@ -24,7 +24,8 @@ use std::time::{Duration, Instant};
 
 use tokio::sync::mpsc;
 
-use rester::app::{App, Modal, Mode};
+use rester::app::{App, Modal, Mode, View};
+use rester::layout::block::block;
 use rester::ui::centered_rect;
 use rester::ui::text_area::TextArea;
 use rester::web_request_handler;
@@ -37,7 +38,6 @@ use tui::{
     widgets::{Block, BorderType, Borders, Paragraph},
     Frame, Terminal,
 };
-use rester::layout::block::block;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -131,60 +131,106 @@ fn ui<B: Backend>(rect: &mut Frame<B>, app: &mut App) {
         )
         .split(size);
 
-    let horizontal_chunks = Layout::default()
+    let header_chunks = Layout::default()
         .direction(Direction::Horizontal)
-        .constraints([Constraint::Percentage(20), Constraint::Percentage(80)].as_ref())
+        .margin(0)
+        .constraints([Constraint::Length(10), Constraint::Min(10)].as_ref())
+        .split(chunks[0]);
+
+    // let horizontal_chunks = Layout::default()
+    //     .direction(Direction::Horizontal)
+    //     .constraints([Constraint::Percentage(20), Constraint::Percentage(80)].as_ref())
+    //     .split(chunks[1]);
+
+    let main_chunks = Layout::default()
+        .direction(Direction::Vertical)
+        .constraints([Constraint::Percentage(75), Constraint::Percentage(25)].as_ref())
         .split(chunks[1]);
 
-    let response_chunks = Layout::default()
-        .direction(Direction::Vertical)
-        .constraints([Constraint::Percentage(50), Constraint::Percentage(50)].as_ref())
-        .split(horizontal_chunks[1]);
+    if app.view == View::Response {
+        let mut header_response_paragraph = app.response_header_paragraph.lock().unwrap();
 
-    let mut header_response_paragraph = app.response_header_paragraph.lock().unwrap();
+        let header_updates = paragraph(
+            rect,
+            main_chunks[1],
+            "Response Headers",
+            header_response_paragraph.as_str(),
+            app.mode == Mode::ResponseHeaders,
+            header_response_paragraph.scroll,
+            header_response_paragraph.cache.clone(),
+        );
 
-    let header_updates = paragraph(
-        rect,
-        response_chunks[1],
-        "Response Headers",
-        header_response_paragraph.as_str(),
-        app.mode == Mode::ResponseHeaders,
-        header_response_paragraph.scroll,
-        header_response_paragraph.cache.clone(),
-    );
+        header_response_paragraph.update(header_updates);
 
-    header_response_paragraph.update(header_updates);
+        let mut response_paragraph = app.response_paragraph.lock().unwrap();
 
-    let mut response_paragraph = app.response_paragraph.lock().unwrap();
+        let res = paragraph(
+            rect,
+            main_chunks[0],
+            "Response Body",
+            response_paragraph.as_str(),
+            app.mode == Mode::ResponseBody,
+            response_paragraph.scroll,
+            response_paragraph.cache.clone(),
+        );
+        response_paragraph.update(res);
+    }
 
-    let res = paragraph(
-        rect,
-        response_chunks[0],
-        "Response Body",
-        response_paragraph.as_str(),
-        app.mode == Mode::ResponseBody,
-        response_paragraph.scroll,
-        response_paragraph.cache.clone(),
-    );
-    response_paragraph.update(res);
+    if app.view == View::Request {
+        rect.render_stateful_widget(
+            TextArea::default()
+                .block(
+                    Block::default()
+                        .borders(Borders::ALL)
+                        .style(Style::default().fg(Color::White))
+                        .title("Request Body")
+                        .border_type(if app.mode == Mode::RequestBody {
+                            BorderType::Double
+                        } else {
+                            BorderType::Plain
+                        }),
+                )
+                .active(app.mode == Mode::RequestBody),
+            main_chunks[0],
+            &mut app.body,
+        );
 
-    let side_chunks = Layout::default()
-        .direction(Direction::Vertical)
-        .constraints(
-            [
-                Constraint::Length(3),
-                Constraint::Min(10),
-                Constraint::Percentage(50),
-            ]
-            .as_ref(),
-        )
-        .split(horizontal_chunks[0]);
+        rect.render_stateful_widget(
+            TextArea::default()
+                .block(
+                    Block::default()
+                        .borders(Borders::ALL)
+                        .style(Style::default().fg(Color::White))
+                        .title("Request Headers")
+                        .border_type(if app.mode == Mode::RequestHeaders {
+                            BorderType::Double
+                        } else {
+                            BorderType::Plain
+                        }),
+                )
+                .active(app.mode == Mode::RequestHeaders),
+            main_chunks[1],
+            &mut app.headers,
+        );
+    }
+
+    // let side_chunks = Layout::default()
+    //     .direction(Direction::Vertical)
+    //     .constraints(
+    //         [
+    //             Constraint::Length(3),
+    //             Constraint::Min(10),
+    //             Constraint::Percentage(50),
+    //         ]
+    //         .as_ref(),
+    //     )
+    //     .split(horizontal_chunks[0]);
 
     let method_str: &'static str = app.method.into();
 
     paragraph(
         rect,
-        side_chunks[0],
+        header_chunks[0],
         "Method",
         method_str,
         app.mode == Mode::Method,
@@ -192,51 +238,29 @@ fn ui<B: Backend>(rect: &mut Frame<B>, app: &mut App) {
         None,
     );
 
-    let params = Block::default()
-        .borders(Borders::ALL)
-        .style(Style::default().fg(Color::White))
-        .title("Params")
-        .border_type(if app.mode == Mode::UrlParams {
-            BorderType::Double
-        } else {
-            BorderType::Plain
-        });
-    rect.render_widget(params, side_chunks[1]);
+    // let params = Block::default()
+    //     .borders(Borders::ALL)
+    //     .style(Style::default().fg(Color::White))
+    //     .title("Params")
+    //     .border_type(if app.mode == Mode::UrlParams {
+    //         BorderType::Double
+    //     } else {
+    //         BorderType::Plain
+    //     });
+    // rect.render_widget(params, side_chunks[1]);
 
     rect.render_stateful_widget(
         TextArea::default()
-            .block(
-                Block::default()
-                    .borders(Borders::ALL)
-                    .style(Style::default().fg(Color::White))
-                    .title("Headers")
-                    .border_type(if app.mode == Mode::RequestHeaders {
-                        BorderType::Double
-                    } else {
-                        BorderType::Plain
-                    }),
-            )
-            .active(app.mode == Mode::RequestHeaders),
-        side_chunks[2],
-        &mut app.headers,
-    );
-
-    rect.render_stateful_widget(
-        TextArea::default()
-            .block(
-                block("Url", app.mode == Mode::Url)
-            )
+            .block(block("Url", app.mode == Mode::Url))
             .active(app.mode == Mode::Url),
-        chunks[0],
+        header_chunks[1],
         &mut app.url,
     );
 
     let copyright = Paragraph::new("")
         .style(Style::default().fg(Color::LightCyan))
         .alignment(Alignment::Center)
-        .block(
-            block("Status", false)
-        );
+        .block(block("Status", false));
 
     if app.modal == Modal::Requests {
         let block = Block::default().style(Style::default().bg(Color::Blue));
