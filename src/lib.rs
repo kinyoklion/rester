@@ -7,6 +7,8 @@ use tokio::sync::mpsc;
 extern crate log;
 
 pub mod app;
+pub mod default_key_binds;
+pub mod key_bind;
 pub mod layout;
 pub mod paragraph_with_state;
 pub mod persistence;
@@ -44,4 +46,18 @@ pub struct Request {
 pub enum ScrollDirection {
     Up,
     Down,
+}
+
+#[derive(Copy, Clone, PartialEq, Debug)]
+pub enum Operation {
+    GotoUrl,
+    GotoRequestBody,
+    GotoRequestHeaders,
+    GotoResponseBody,
+    GotoResponseHeaders,
+    NextMethod,
+    LoadRequest,
+    SaveRequest,
+    GotoRequestView,
+    GotoResponseView,
 }

@@ -1,10 +1,11 @@
 use crate::paragraph_with_state::ParagraphWithState;
 use crate::persistence::RequestCollection;
 
-use crate::{Method, Request, Response};
+use crate::{default_key_binds, Method, Operation, Request, Response};
 use bytes::Bytes;
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 
+use crate::key_bind::KeyBind;
 use crate::ui::text_area::{EditCommand, EditState};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
@@ -51,6 +52,7 @@ pub struct App {
     pub request_name: String,
     pub request_collection: RequestCollection,
     pub request_selection_state: ListState,
+    pub key_binds: Vec<KeyBind>,
 }
 
 impl App {
@@ -79,6 +81,7 @@ impl App {
             request_collection: RequestCollection::load(),
             request_selection_state: ListState::default(),
             view: View::Request,
+            key_binds: default_key_binds::default_key_binds(),
         }
     }
 }
@@ -158,48 +161,65 @@ impl App {
         }
     }
 
-    pub fn handle_input(&mut self, key: KeyEvent) -> bool {
-        info!("KEY {:?}", key);
-        if key.modifiers.contains(KeyModifiers::CONTROL) {
-            // info!("CONTROL MODIFIER");
-            match key.code {
-                KeyCode::Down => {
-                    self.next_mode(false);
-                    return false;
+    fn handle_operation(&mut self, operation: Operation) {
+        match operation {
+            Operation::GotoUrl => {
+                self.mode = Mode::Url;
+            }
+            Operation::GotoRequestBody => {
+                self.set_view(View::Request);
+                self.mode = Mode::RequestBody;
+            }
+            Operation::GotoRequestHeaders => {
+                self.set_view(View::Request);
+                self.mode = Mode::RequestHeaders;
+            }
+            Operation::GotoResponseBody => {
+                self.set_view(View::Response);
+                self.mode = Mode::RequestHeaders;
+            }
+            Operation::GotoResponseHeaders => {
+                self.set_view(View::Response);
+                self.mode = Mode::ResponseHeaders
+            }
+            Operation::NextMethod => {
+                self.next_method();
+            }
+            Operation::LoadRequest => {
+                if self.modal == Modal::None {
+                    self.modal = Modal::Requests;
+                    self.request_selection_state.select(Some(0));
                 }
-                KeyCode::Up => {
-                    self.next_mode(true);
-                    return false;
+            }
+            Operation::SaveRequest => {
+                if self.modal == Modal::None {
+                    self.modal = Modal::Save;
                 }
-                KeyCode::Char(c) => match c.to_ascii_lowercase() {
-                    's' => {
-                        if self.modal == Modal::None {
-                            self.modal = Modal::Save;
-                        }
-                    }
-                    'r' => {
-                        if self.modal == Modal::None {
-                            self.modal = Modal::Requests;
-                            self.request_selection_state.select(Some(0));
-                        }
-                    }
-                    'p' => self.next_method(),
-                    'a' => self.set_view(View::Request),
-                    'q' => self.set_view(View::Response),
+            }
+            Operation::GotoRequestView => {
+                self.set_view(View::Request);
+            }
+            Operation::GotoResponseView => {
+                self.set_view(View::Response);
+            }
+        };
+    }
 
-                    'b' => {
-                        self.set_view(View::Request);
-                        self.mode = Mode::RequestBody;
-                    }
-                    'h' => {
-                        self.set_view(View::Request);
-                        self.mode = Mode::RequestHeaders;
-                    }
-                    'u' => self.mode = Mode::Url,
-                    _ => {}
-                },
-                _ => {}
-            };
+    pub fn handle_input(&mut self, key: KeyEvent) -> bool {
+        let key_bind = self
+            .key_binds
+            .iter()
+            .find(|key_bind| key_bind.key == key.code && key.modifiers == key_bind.modifiers);
+
+        if let Some(key_bind) = key_bind {
+            let operation = key_bind.operation.clone();
+            self.handle_operation(operation);
+            return false;
+        }
+
+        if key.modifiers.contains(KeyModifiers::CONTROL)
+            || key.modifiers.contains(KeyModifiers::ALT)
+        {
             return false;
         }
         match key.code {

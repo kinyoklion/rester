@@ -25,10 +25,11 @@ use std::time::{Duration, Instant};
 use tokio::sync::mpsc;
 
 use rester::app::{App, Modal, Mode, View};
+use rester::key_bind::get_help;
 use rester::layout::block::block;
 use rester::ui::centered_rect;
 use rester::ui::text_area::TextArea;
-use rester::web_request_handler;
+use rester::{web_request_handler, Operation};
 use tui::style::Modifier;
 use tui::widgets::{Clear, List, ListItem};
 use tui::{
@@ -137,11 +138,6 @@ fn ui<B: Backend>(rect: &mut Frame<B>, app: &mut App) {
         .constraints([Constraint::Length(11), Constraint::Min(11)].as_ref())
         .split(chunks[0]);
 
-    // let horizontal_chunks = Layout::default()
-    //     .direction(Direction::Horizontal)
-    //     .constraints([Constraint::Percentage(20), Constraint::Percentage(80)].as_ref())
-    //     .split(chunks[1]);
-
     let main_chunks = Layout::default()
         .direction(Direction::Vertical)
         .constraints([Constraint::Percentage(75), Constraint::Percentage(25)].as_ref())
@@ -153,7 +149,12 @@ fn ui<B: Backend>(rect: &mut Frame<B>, app: &mut App) {
         let header_updates = paragraph(
             rect,
             main_chunks[1],
-            "Response Headers",
+            get_help(
+                "Response Headers",
+                Operation::GotoResponseHeaders,
+                &app.key_binds,
+            )
+            .as_str(),
             header_response_paragraph.as_str(),
             app.mode == Mode::ResponseHeaders,
             header_response_paragraph.scroll,
@@ -167,7 +168,7 @@ fn ui<B: Backend>(rect: &mut Frame<B>, app: &mut App) {
         let res = paragraph(
             rect,
             main_chunks[0],
-            "Response Body",
+            get_help("Response Body", Operation::GotoResponseBody, &app.key_binds).as_str(),
             response_paragraph.as_str(),
             app.mode == Mode::ResponseBody,
             response_paragraph.scroll,
@@ -183,7 +184,11 @@ fn ui<B: Backend>(rect: &mut Frame<B>, app: &mut App) {
                     Block::default()
                         .borders(Borders::ALL)
                         .style(Style::default().fg(Color::White))
-                        .title("Request Body ^b")
+                        .title(get_help(
+                            "Request Body",
+                            Operation::GotoRequestBody,
+                            &app.key_binds,
+                        ))
                         .border_type(if app.mode == Mode::RequestBody {
                             BorderType::Double
                         } else {
@@ -201,7 +206,11 @@ fn ui<B: Backend>(rect: &mut Frame<B>, app: &mut App) {
                     Block::default()
                         .borders(Borders::ALL)
                         .style(Style::default().fg(Color::White))
-                        .title("Request Headers ^h")
+                        .title(get_help(
+                            "Request Headers",
+                            Operation::GotoRequestHeaders,
+                            &app.key_binds,
+                        ))
                         .border_type(if app.mode == Mode::RequestHeaders {
                             BorderType::Double
                         } else {
@@ -219,7 +228,7 @@ fn ui<B: Backend>(rect: &mut Frame<B>, app: &mut App) {
     paragraph(
         rect,
         header_chunks[0],
-        "Method ^p",
+        get_help("Method", Operation::NextMethod, &app.key_binds).as_str(),
         method_str,
         app.mode == Mode::Method,
         0,
@@ -228,13 +237,24 @@ fn ui<B: Backend>(rect: &mut Frame<B>, app: &mut App) {
 
     rect.render_stateful_widget(
         TextArea::default()
-            .block(block("Url ^u", app.mode == Mode::Url))
+            .block(block(
+                get_help("Url", Operation::GotoUrl, &app.key_binds).as_str(),
+                app.mode == Mode::Url,
+            ))
             .active(app.mode == Mode::Url),
         header_chunks[1],
         &mut app.url,
     );
 
-    let status_help = Paragraph::new("^q - Response, ^r - Load Request, ^s - Save Request")
+    let help_string = format!(
+        "{:} {:} {:} {:} ",
+        get_help("Response -", Operation::GotoResponseView, &app.key_binds),
+        get_help("Request -", Operation::GotoRequestView, &app.key_binds),
+        get_help("Load Request -", Operation::LoadRequest, &app.key_binds),
+        get_help("Save Request -", Operation::SaveRequest, &app.key_binds),
+    );
+
+    let status_help = Paragraph::new(help_string.as_str())
         .style(Style::default().fg(Color::LightCyan))
         .alignment(Alignment::Center)
         .block(block("Status/Help", false));
