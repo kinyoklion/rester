@@ -7,29 +7,22 @@ use crossterm::{
     execute,
     terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
 };
-use rester::ui::paragraph::{paragraph, paragraph_color};
-
 use log::LevelFilter;
-
-use simplelog::{CombinedLogger, Config, WriteLogger};
-use std::fs::File;
-
-use std::str;
-
-use std::io;
-use std::sync::atomic::Ordering;
-
-use std::thread::sleep;
-use std::time::{Duration, Instant};
-
-use tokio::sync::mpsc;
-
 use rester::app::{App, Modal, Mode, View};
 use rester::key_bind::get_help;
 use rester::layout::block::block;
 use rester::ui::centered_rect;
+use rester::ui::paragraph::{paragraph, paragraph_color};
 use rester::ui::text_area::TextArea;
 use rester::{web_request_handler, Operation};
+use simplelog::{CombinedLogger, Config, WriteLogger};
+use std::fs::File;
+use std::io;
+use std::str;
+use std::sync::atomic::Ordering;
+use std::thread::sleep;
+use std::time::{Duration, Instant};
+use tokio::sync::mpsc;
 use tui::style::Modifier;
 use tui::widgets::{Clear, List, ListItem};
 use tui::{
@@ -247,11 +240,17 @@ fn ui<B: Backend>(rect: &mut Frame<B>, app: &mut App) {
     );
 
     let help_string = format!(
-        "{:} {:} {:} {:} ",
-        get_help("Response -", Operation::GotoResponseView, &app.key_binds),
-        get_help("Request -", Operation::GotoRequestView, &app.key_binds),
-        get_help("Load Request -", Operation::LoadRequest, &app.key_binds),
-        get_help("Save Request -", Operation::SaveRequest, &app.key_binds),
+        "{:} {:} {:} {:} {:} {:}",
+        get_help("Req", Operation::GotoResponseView, &app.key_binds),
+        get_help("Res", Operation::GotoRequestView, &app.key_binds),
+        get_help("Load", Operation::LoadRequest, &app.key_binds),
+        get_help("Save", Operation::SaveRequest, &app.key_binds),
+        get_help("Quit", Operation::Quit, &app.key_binds),
+        if app.mode != Mode::Url {
+            get_help("Send", Operation::SendRequest, &app.key_binds)
+        } else {
+            "Send ⏎".to_string()
+        }
     );
 
     let status_help = Paragraph::new(help_string.as_str())
@@ -278,8 +277,9 @@ fn ui<B: Backend>(rect: &mut Frame<B>, app: &mut App) {
             .block(Block::default().borders(Borders::ALL).title("Requests"))
             .highlight_style(
                 Style::default()
-                    .bg(Color::LightGreen)
-                    .add_modifier(Modifier::BOLD),
+                    .bg(Color::Cyan)
+                    .add_modifier(Modifier::BOLD)
+                    .fg(Color::Black),
             )
             .highlight_symbol(">> ");
 

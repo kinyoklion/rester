@@ -54,5 +54,15 @@ pub fn default_key_binds() -> Vec<KeyBind> {
             modifiers: KeyModifiers::CONTROL,
             key: KeyCode::Char('q'),
         },
+        KeyBind {
+            operation: Operation::SendRequest,
+            modifiers: KeyModifiers::ALT,
+            key: KeyCode::Enter,
+        },
+        KeyBind {
+            operation: Operation::Quit,
+            modifiers: KeyModifiers::CONTROL,
+            key: KeyCode::Char('w'),
+        },
     ]
 }

@@ -60,4 +60,6 @@ pub enum Operation {
     SaveRequest,
     GotoRequestView,
     GotoResponseView,
+    SendRequest,
+    Quit,
 }

@@ -161,7 +161,7 @@ impl App {
         }
     }
 
-    fn handle_operation(&mut self, operation: Operation) {
+    fn handle_operation(&mut self, operation: Operation) -> bool {
         match operation {
             Operation::GotoUrl => {
                 self.mode = Mode::Url;
@@ -202,10 +202,19 @@ impl App {
             Operation::GotoResponseView => {
                 self.set_view(View::Response);
             }
+            Operation::SendRequest => {
+                self.make_request();
+                self.set_view(View::Response);
+            }
+            Operation::Quit => {
+                return true;
+            }
         };
+        false
     }
 
     pub fn handle_input(&mut self, key: KeyEvent) -> bool {
+        info!("Handling {:?}", key);
         let key_bind = self
             .key_binds
             .iter()
@@ -213,8 +222,7 @@ impl App {
 
         if let Some(key_bind) = key_bind {
             let operation = key_bind.operation.clone();
-            self.handle_operation(operation);
-            return false;
+            return self.handle_operation(operation);
         }
 
         if key.modifiers.contains(KeyModifiers::CONTROL)
@@ -225,7 +233,7 @@ impl App {
         match key.code {
             KeyCode::Esc => {
                 return if self.modal == Modal::None {
-                    true
+                    false
                 } else {
                     self.modal = Modal::None;
                     false
