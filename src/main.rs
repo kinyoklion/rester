@@ -134,7 +134,7 @@ fn ui<B: Backend>(rect: &mut Frame<B>, app: &mut App) {
     let header_chunks = Layout::default()
         .direction(Direction::Horizontal)
         .margin(0)
-        .constraints([Constraint::Length(10), Constraint::Min(10)].as_ref())
+        .constraints([Constraint::Length(11), Constraint::Min(11)].as_ref())
         .split(chunks[0]);
 
     // let horizontal_chunks = Layout::default()
@@ -183,7 +183,7 @@ fn ui<B: Backend>(rect: &mut Frame<B>, app: &mut App) {
                     Block::default()
                         .borders(Borders::ALL)
                         .style(Style::default().fg(Color::White))
-                        .title("Request Body")
+                        .title("Request Body ^b")
                         .border_type(if app.mode == Mode::RequestBody {
                             BorderType::Double
                         } else {
@@ -201,7 +201,7 @@ fn ui<B: Backend>(rect: &mut Frame<B>, app: &mut App) {
                     Block::default()
                         .borders(Borders::ALL)
                         .style(Style::default().fg(Color::White))
-                        .title("Request Headers")
+                        .title("Request Headers ^h")
                         .border_type(if app.mode == Mode::RequestHeaders {
                             BorderType::Double
                         } else {
@@ -214,53 +214,30 @@ fn ui<B: Backend>(rect: &mut Frame<B>, app: &mut App) {
         );
     }
 
-    // let side_chunks = Layout::default()
-    //     .direction(Direction::Vertical)
-    //     .constraints(
-    //         [
-    //             Constraint::Length(3),
-    //             Constraint::Min(10),
-    //             Constraint::Percentage(50),
-    //         ]
-    //         .as_ref(),
-    //     )
-    //     .split(horizontal_chunks[0]);
-
     let method_str: &'static str = app.method.into();
 
     paragraph(
         rect,
         header_chunks[0],
-        "Method",
+        "Method ^p",
         method_str,
         app.mode == Mode::Method,
         0,
         None,
     );
 
-    // let params = Block::default()
-    //     .borders(Borders::ALL)
-    //     .style(Style::default().fg(Color::White))
-    //     .title("Params")
-    //     .border_type(if app.mode == Mode::UrlParams {
-    //         BorderType::Double
-    //     } else {
-    //         BorderType::Plain
-    //     });
-    // rect.render_widget(params, side_chunks[1]);
-
     rect.render_stateful_widget(
         TextArea::default()
-            .block(block("Url", app.mode == Mode::Url))
+            .block(block("Url ^u", app.mode == Mode::Url))
             .active(app.mode == Mode::Url),
         header_chunks[1],
         &mut app.url,
     );
 
-    let copyright = Paragraph::new("")
+    let status_help = Paragraph::new("^q - Response, ^r - Load Request, ^s - Save Request")
         .style(Style::default().fg(Color::LightCyan))
         .alignment(Alignment::Center)
-        .block(block("Status", false));
+        .block(block("Status/Help", false));
 
     if app.modal == Modal::Requests {
         let block = Block::default().style(Style::default().bg(Color::Blue));
@@ -309,7 +286,7 @@ fn ui<B: Backend>(rect: &mut Frame<B>, app: &mut App) {
         );
     }
 
-    rect.render_widget(copyright, chunks[2]);
+    rect.render_widget(status_help, chunks[2]);
     let duration = start.elapsed();
 
     info!("Time elapsed rendering ui is: {:?}", duration);

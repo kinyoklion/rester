@@ -159,8 +159,18 @@ impl App {
     }
 
     pub fn handle_input(&mut self, key: KeyEvent) -> bool {
+        info!("KEY {:?}", key);
         if key.modifiers.contains(KeyModifiers::CONTROL) {
+            // info!("CONTROL MODIFIER");
             match key.code {
+                KeyCode::Down => {
+                    self.next_mode(false);
+                    return false;
+                }
+                KeyCode::Up => {
+                    self.next_mode(true);
+                    return false;
+                }
                 KeyCode::Char(c) => match c.to_ascii_lowercase() {
                     's' => {
                         if self.modal == Modal::None {
@@ -176,6 +186,16 @@ impl App {
                     'p' => self.next_method(),
                     'a' => self.set_view(View::Request),
                     'q' => self.set_view(View::Response),
+
+                    'b' => {
+                        self.set_view(View::Request);
+                        self.mode = Mode::RequestBody;
+                    }
+                    'h' => {
+                        self.set_view(View::Request);
+                        self.mode = Mode::RequestHeaders;
+                    }
+                    'u' => self.mode = Mode::Url,
                     _ => {}
                 },
                 _ => {}
@@ -190,14 +210,6 @@ impl App {
                     self.modal = Modal::None;
                     false
                 }
-            }
-            KeyCode::Tab => {
-                self.next_mode(false);
-                return false;
-            }
-            KeyCode::BackTab => {
-                self.next_mode(true);
-                return false;
             }
             _ => {}
         }
