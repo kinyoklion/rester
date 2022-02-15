@@ -228,6 +228,7 @@ impl App {
         builder.url(self.url.as_str());
         builder.method(self.method);
         builder.headers(self.headers.as_str());
+        builder.body(self.body.as_str());
         self.request_collection.add_request(builder.build());
         self.request_collection.save();
         // TODO: Need to implement some error handling here.
@@ -258,6 +259,10 @@ impl App {
                 self.url.set_value(request.url.clone());
                 self.method = request.method;
                 self.request_name = request.key.clone();
+                if let Some(body) = &request.body {
+                    self.body.set_value(body.clone());
+                }
+
                 self.headers.set_value(request.headers_to_string());
 
                 self.modal = Modal::None;

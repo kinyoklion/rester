@@ -14,7 +14,7 @@ pub struct KeyValuePair {
 
 impl KeyValuePair {
     pub fn to_string(&self) -> String {
-        format!("{:?}:{:?}", self.key, self.value)
+        format!("{:}:{:}", self.key, self.value)
     }
 }
 
@@ -23,13 +23,12 @@ pub struct Request {
     pub key: String,
     pub method: Method,
     pub url: String,
-    // Headers and params are lists for deterministic
+    // Headers is a list for deterministic
     // JSON ordering. Versus an object which an editor may
     // re-order.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub headers: Option<Vec<KeyValuePair>>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub params: Option<Vec<KeyValuePair>>,
+    pub body: Option<String>,
 }
 
 impl Request {
@@ -45,14 +44,11 @@ impl Request {
 }
 
 pub struct RequestBuilder {
-    pub key: String,
-    pub method: Method,
-    pub url: Option<String>,
-    // Headers and params are lists for deterministic
-    // JSON ordering. Versus an object which an editor may
-    // re-order.
-    pub headers: Option<String>,
-    pub params: Option<String>,
+    key: String,
+    method: Method,
+    url: Option<String>,
+    body: Option<String>,
+    headers: Option<String>,
 }
 
 impl RequestBuilder {
@@ -62,7 +58,7 @@ impl RequestBuilder {
             method: Method::GET,
             url: None,
             headers: None,
-            params: None,
+            body: None,
         }
     }
 
@@ -78,6 +74,11 @@ impl RequestBuilder {
 
     pub fn method(&mut self, method: Method) -> &Self {
         self.method = method;
+        self
+    }
+
+    pub fn body(&mut self, body: &str) -> &Self {
+        self.body = Some(body.to_string());
         self
     }
 
@@ -106,10 +107,10 @@ impl RequestBuilder {
 
         Request {
             key: self.key,
-            method: Method::GET,
+            method: self.method,
             url: self.url.expect("Must set URL."),
             headers,
-            params: None,
+            body: self.body,
         }
     }
 }
