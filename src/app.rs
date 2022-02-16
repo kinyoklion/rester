@@ -177,7 +177,7 @@ impl App {
             }
             Operation::GotoResponseBody => {
                 self.set_view(View::Response);
-                self.mode = Mode::RequestHeaders;
+                self.mode = Mode::ResponseBody;
             }
             Operation::GotoResponseHeaders => {
                 self.set_view(View::Response);
