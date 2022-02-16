@@ -20,5 +20,13 @@ jobs:
       run: cargo build --verbose
     - name: Run tests
       run: cargo test --verbose
+    - name: Install Cargo Bump
+      run: cargo install cargo-bump
+    - name: Bump Version
+      run: cargo bump minor
     - name: Publish Crate
       run: cargo publish --token ${{ secrets.CARGO_TOKEN }}
+    - uses: EndBug/add-and-commit@v8
+      with:
+        message: Show GitHub Actions logo
+        committer_name: GitHub Actions
