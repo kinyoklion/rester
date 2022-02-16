@@ -7,6 +7,7 @@ use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 
 use crate::key_bind::KeyBind;
 use crate::ui::text_area::{EditCommand, EditState};
+use reqwest::header::HeaderValue;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 use tokio::sync::mpsc;
@@ -413,12 +414,20 @@ impl App {
                 .await
                 .unwrap();
 
+            let mut content_type = "text/plain".to_string();
+
             loop {
                 let res = rx.recv().await;
 
                 match res {
                     Some(Response::Headers(res)) => {
                         let header_string = jsonxf::pretty_print(format!("{:?}", res).as_str());
+                        content_type = res
+                            .get("content-type")
+                            .unwrap_or(&HeaderValue::from_str(content_type.as_str()).unwrap())
+                            .to_str()
+                            .unwrap_or("text/plain")
+                            .to_string();
                         if let Ok(header_string) = header_string {
                             response_header_paragraph
                                 .lock()
@@ -431,15 +440,26 @@ impl App {
 
                         let decoded_string = String::from_utf8_lossy(&res);
                         let pretty_json = jsonxf::pretty_print(decoded_string.to_string().as_str());
-
-                        let final_string = if let Ok(pretty_json) = pretty_json {
-                            pretty_json
+                        info!("Decoded {:}", decoded_string);
+                        let final_string = if content_type.contains("json") {
+                            info!("IS JSON");
+                            if let Ok(pretty_json) = pretty_json {
+                                pretty_json
+                            } else {
+                                decoded_string.to_string()
+                            }
                         } else {
                             decoded_string.to_string()
                         };
+                        // let final_string = if let Ok(pretty_json) = pretty_json {
+                        //     pretty_json
+                        // } else {
+                        //     decoded_string.to_string()
+                        // };
+                        // let final_string = decoded_string.to_string();
 
                         *response_bytes = Some(res);
-                        res_paragraph.lock().unwrap().set_value(final_string);
+                        res_paragraph.lock().unwrap().append_value(final_string);
                         dirty.store(true, Ordering::SeqCst);
                     }
                     _ => {

@@ -38,6 +38,12 @@ impl ParagraphWithState {
 
     pub fn set_value(&mut self, value: String) {
         self.value = value;
+        self.cache = None;
+    }
+
+    pub fn append_value(&mut self, value: String) {
+        self.value.push_str(value.as_str());
+        self.cache = None;
     }
 
     pub fn handle_input(&mut self, key: KeyEvent) {

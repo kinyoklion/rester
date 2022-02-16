@@ -41,18 +41,25 @@ pub fn web_request_handler(mut receiver: Receiver<Request>) {
                     let res = req_builder.send().await;
                     // println!("Got {:?}", res);
                     match res {
-                        Ok(res) => {
+                        Ok(mut res) => {
                             match req
                                 .resp
                                 .send(Response::Headers(res.headers().clone()))
                                 .await
                             {
                                 Ok(_) => {
-                                    let bytes = res.bytes().await;
-                                    if let Ok(bytes) = bytes {
-                                        if let Err(err) = req.resp.send(Response::Body(bytes)).await
-                                        {
-                                            error!("Error replying to request {:?}", err);
+                                    // res.chunk().await
+                                    loop {
+                                        let bytes = res.chunk().await;
+                                        if let Ok(Some(bytes)) = bytes {
+                                            if let Err(err) =
+                                                req.resp.send(Response::Body(bytes)).await
+                                            {
+                                                error!("Error replying to request {:?}", err);
+                                                break;
+                                            }
+                                        } else {
+                                            break;
                                         }
                                     }
                                 }
