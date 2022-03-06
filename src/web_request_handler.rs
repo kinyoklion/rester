@@ -15,7 +15,7 @@ pub fn web_request_handler(mut receiver: Receiver<Request>) {
                     info!("Request present");
                     // println!("Request {:?}", req);
                     let mut header_map = HeaderMap::new();
-                    let headers: Vec<&str> = req.headers.split("\r\n").collect();
+                    let headers: Vec<&str> = req.headers.split("\n").collect();
 
                     for entry in headers {
                         if let Some((key, value)) = entry.split_once(":") {
