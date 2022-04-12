@@ -139,7 +139,7 @@ fn ui<B: Backend>(rect: &mut Frame<B>, app: &mut App) {
     if app.view == View::Response {
         let mut header_response_paragraph = app.response_header_paragraph.lock().unwrap();
         let status = app.status.load(Ordering::SeqCst);
-        let statusString = if status != 0 {
+        let status_string = if status != 0 {
             format!("Response Headers (Status {:})", status)
         } else {
             "Response Headers".to_string()
@@ -149,7 +149,7 @@ fn ui<B: Backend>(rect: &mut Frame<B>, app: &mut App) {
             rect,
             main_chunks[1],
             get_help(
-                statusString.as_str(),
+                status_string.as_str(),
                 Operation::GotoResponseHeaders,
                 &app.key_binds,
             )
