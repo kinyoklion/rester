@@ -42,33 +42,32 @@ pub fn web_request_handler(mut receiver: Receiver<Request>) {
                     // println!("Got {:?}", res);
                     match res {
                         Ok(mut res) => {
-                            match req
+                            let _ = req.resp.send(Response::Status(res.status())).await;
+                            let _ = req
                                 .resp
                                 .send(Response::Headers(res.headers().clone()))
-                                .await
-                            {
-                                Ok(_) => {
-                                    // res.chunk().await
-                                    loop {
-                                        let bytes = res.chunk().await;
-                                        if let Ok(Some(bytes)) = bytes {
-                                            if let Err(err) =
-                                                req.resp.send(Response::Body(bytes)).await
-                                            {
-                                                error!("Error replying to request {:?}", err);
-                                                break;
-                                            }
-                                        } else {
-                                            break;
-                                        }
-                                    }
-                                }
-                                Err(err) => {
-                                    error!("Error sending request: {:?}", err);
-                                    if let Err(err) = req.resp.send(Response::Failure).await {
+                                .await;
+                            // {
+                            //     Ok(_) => {
+                            // res.chunk().await
+                            loop {
+                                let bytes = res.chunk().await;
+                                if let Ok(Some(bytes)) = bytes {
+                                    if let Err(err) = req.resp.send(Response::Body(bytes)).await {
                                         error!("Error replying to request {:?}", err);
+                                        break;
                                     }
+                                } else {
+                                    break;
                                 }
+                                //     }
+                                // }
+                                // Err(err) => {
+                                //     error!("Error sending request: {:?}", err);
+                                //     if let Err(err) = req.resp.send(Response::Failure).await {
+                                //         error!("Error replying to request {:?}", err);
+                                //     }
+                                // }
                             }
                         }
                         Err(_) => {

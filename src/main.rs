@@ -138,12 +138,18 @@ fn ui<B: Backend>(rect: &mut Frame<B>, app: &mut App) {
 
     if app.view == View::Response {
         let mut header_response_paragraph = app.response_header_paragraph.lock().unwrap();
+        let status = app.status.load(Ordering::SeqCst);
+        let statusString = if status != 0 {
+            format!("Response Headers (Status {:})", status)
+        } else {
+            "Response Headers".to_string()
+        };
 
         let header_updates = paragraph(
             rect,
             main_chunks[1],
             get_help(
-                "Response Headers",
+                statusString.as_str(),
                 Operation::GotoResponseHeaders,
                 &app.key_binds,
             )
@@ -256,7 +262,7 @@ fn ui<B: Backend>(rect: &mut Frame<B>, app: &mut App) {
     let status_help = Paragraph::new(help_string.as_str())
         .style(Style::default().fg(Color::LightCyan))
         .alignment(Alignment::Center)
-        .block(block("Status/Help", false));
+        .block(block("Help", false));
 
     if app.modal == Modal::Requests {
         let block = Block::default().style(Style::default().bg(Color::Blue));

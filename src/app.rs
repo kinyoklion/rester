@@ -8,7 +8,7 @@ use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 use crate::key_bind::KeyBind;
 use crate::ui::text_area::{EditCommand, EditState};
 use reqwest::header::HeaderValue;
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU16, Ordering};
 use std::sync::{Arc, Mutex};
 use tokio::sync::mpsc;
 use tui::widgets::ListState;
@@ -54,6 +54,7 @@ pub struct App {
     pub request_collection: RequestCollection,
     pub request_selection_state: ListState,
     pub key_binds: Vec<KeyBind>,
+    pub status: Arc<AtomicU16>,
 }
 
 impl App {
@@ -83,6 +84,7 @@ impl App {
             request_selection_state: ListState::default(),
             view: View::Request,
             key_binds: default_key_binds::default_key_binds(),
+            status: Arc::new(AtomicU16::new(0)),
         }
     }
 }
@@ -400,6 +402,7 @@ impl App {
         let body = String::from(self.body.as_str());
         let dirty = self.dirty.clone();
         let response_header_paragraph = self.response_header_paragraph.clone();
+        let app_status = self.status.clone();
 
         tokio::spawn(async move {
             let (tx, mut rx) = mpsc::channel(10);
@@ -420,6 +423,9 @@ impl App {
                 let res = rx.recv().await;
 
                 match res {
+                    Some(Response::Status(status)) => {
+                        app_status.store(status.as_u16(), Ordering::SeqCst);
+                    }
                     Some(Response::Headers(res)) => {
                         let header_string = jsonxf::pretty_print(format!("{:?}", res).as_str());
                         content_type = res

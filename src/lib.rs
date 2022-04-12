@@ -1,5 +1,6 @@
 use bytes::Bytes;
 use reqwest::header::HeaderMap;
+use reqwest::StatusCode;
 use serde::{Deserialize, Serialize};
 use strum_macros::IntoStaticStr;
 use tokio::sync::mpsc;
@@ -28,6 +29,7 @@ pub enum Method {
 
 #[derive(Debug)]
 pub enum Response {
+    Status(StatusCode),
     Headers(HeaderMap),
     Body(Bytes),
     Failure,
