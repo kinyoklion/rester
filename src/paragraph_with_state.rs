@@ -44,6 +44,7 @@ impl ParagraphWithState {
     pub fn append_value(&mut self, value: String) {
         self.value.push_str(value.as_str());
         self.cache = None;
+        self.scroll = u16::MAX;
     }
 
     pub fn handle_input(&mut self, key: KeyEvent) {
