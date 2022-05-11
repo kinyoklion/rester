@@ -40,6 +40,11 @@ pub fn default_key_binds() -> Vec<KeyBind> {
             key: KeyCode::Char('s'),
         },
         KeyBind {
+            operation: Operation::SaveResponse,
+            modifiers: KeyModifiers::ALT,
+            key: KeyCode::Char('s'),
+        },
+        KeyBind {
             operation: Operation::NextMethod,
             modifiers: KeyModifiers::CONTROL,
             key: KeyCode::Char('p'),

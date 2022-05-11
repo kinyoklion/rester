@@ -60,6 +60,7 @@ pub enum Operation {
     NextMethod,
     LoadRequest,
     SaveRequest,
+    SaveResponse,
     GotoRequestView,
     GotoResponseView,
     SendRequest,

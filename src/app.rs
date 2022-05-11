@@ -1,5 +1,7 @@
 use crate::paragraph_with_state::ParagraphWithState;
 use crate::persistence::RequestCollection;
+use std::fs::File;
+use std::io::Write;
 
 use crate::{default_key_binds, Method, Operation, Request, Response};
 use bytes::Bytes;
@@ -197,6 +199,24 @@ impl App {
             Operation::SaveRequest => {
                 if self.modal == Modal::None {
                     self.modal = Modal::Save;
+                }
+            }
+            Operation::SaveResponse => {
+                let resp = self.response_paragraph.lock();
+                let para = &*resp.unwrap();
+
+                let url = self.url.as_str().to_string();
+                let url = url.replace("://", "_");
+                let url = url.replace("/", "_");
+                let url = url.replace(":", "_");
+                let mut filename = sanitize_filename::sanitize(url);
+                filename.push_str(".txt");
+
+                let file = File::create(filename);
+                if let Ok(mut file) = file {
+                    if let Err(err) = file.write_all(para.as_str().as_bytes()) {
+                        error!("Error writing file {:?}", err);
+                    }
                 }
             }
             Operation::GotoRequestView => {
