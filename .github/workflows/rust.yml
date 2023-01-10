@@ -28,5 +28,5 @@ jobs:
       run: cargo publish --token ${{ secrets.CARGO_TOKEN }} --allow-dirty
     - uses: EndBug/add-and-commit@v8
       with:
-        message: Show GitHub Actions logo
+        message: Committing release version
         committer_name: GitHub Actions
