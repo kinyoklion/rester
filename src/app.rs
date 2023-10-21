@@ -3,7 +3,7 @@ use crate::persistence::RequestCollection;
 use std::fs::File;
 use std::io::Write;
 
-use crate::{default_key_binds, Method, Operation, Request, Response};
+use crate::{default_key_binds, Method, Operation, Request, Response, WebRequest};
 use bytes::Bytes;
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 
@@ -45,7 +45,7 @@ pub struct App {
     pub method: Method,
     pub headers: EditState,
     pub body: EditState,
-    pub sender: mpsc::Sender<Request>,
+    pub sender: mpsc::Sender<WebRequest>,
     pub response: Arc<Mutex<Option<Bytes>>>,
     pub response_paragraph: Arc<Mutex<ParagraphWithState>>,
     pub response_header_paragraph: Arc<Mutex<ParagraphWithState>>,
@@ -60,7 +60,7 @@ pub struct App {
 }
 
 impl App {
-    pub fn new(sender: mpsc::Sender<Request>) -> Self {
+    pub fn new(sender: mpsc::Sender<WebRequest>) -> Self {
         App {
             url: EditState::new(""),
             headers: EditState::new(""),
@@ -426,14 +426,18 @@ impl App {
 
         tokio::spawn(async move {
             let (tx, mut rx) = mpsc::channel(10);
+            // This isn't the most elegant solution, but we just send a cancel before the operation
+            // and this breaks us out of the previous request one was still streaming a body. This
+            // would be especially common for an SSE stream.
+            sender.send(WebRequest::Cancel).await.unwrap();
             sender
-                .send(Request {
+                .send(WebRequest::Request(Request {
                     method,
                     url,
                     headers,
                     resp: tx,
                     body,
-                })
+                }))
                 .await
                 .unwrap();
 

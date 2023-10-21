@@ -1,19 +1,19 @@
-use crate::{Method, Request, Response};
+use crate::WebRequest::{Cancel, Request};
+use crate::{Method, Response, WebRequest};
 use reqwest::header::{HeaderMap, HeaderName, HeaderValue};
 use std::str;
 use std::str::FromStr;
+use tokio::select;
 use tokio::sync::mpsc::Receiver;
 
-pub fn web_request_handler(mut receiver: Receiver<Request>) {
+pub fn web_request_handler(mut receiver: Receiver<WebRequest>) {
     tokio::spawn(async move {
         loop {
             let client = reqwest::Client::new();
             let req = receiver.recv().await;
-            // println!("Request {:?}", req);
             match req {
-                Some(req) => {
+                Some(Request(req)) => {
                     info!("Request present");
-                    // println!("Request {:?}", req);
                     let mut header_map = HeaderMap::new();
                     let headers: Vec<&str> = req.headers.split("\n").collect();
 
@@ -39,7 +39,6 @@ pub fn web_request_handler(mut receiver: Receiver<Request>) {
                         req_builder = req_builder.body(req.body)
                     }
                     let res = req_builder.send().await;
-                    // println!("Got {:?}", res);
                     match res {
                         Ok(mut res) => {
                             let _ = req.resp.send(Response::Status(res.status())).await;
@@ -47,27 +46,29 @@ pub fn web_request_handler(mut receiver: Receiver<Request>) {
                                 .resp
                                 .send(Response::Headers(res.headers().clone()))
                                 .await;
-                            // {
-                            //     Ok(_) => {
-                            // res.chunk().await
+
                             loop {
-                                let bytes = res.chunk().await;
-                                if let Ok(Some(bytes)) = bytes {
-                                    if let Err(err) = req.resp.send(Response::Body(bytes)).await {
-                                        error!("Error replying to request {:?}", err);
+                                let bytes_future = res.chunk();
+                                let request_op = receiver.recv();
+
+                                select! {
+                                    in_bytes = bytes_future => {
+                                        if let Ok(Some(bytes)) = in_bytes {
+                                            if let Err(err) = req.resp.send(Response::Body(bytes)).await {
+                                                error!("Error replying to request {:?}", err);
+                                                break;
+                                            }
+                                        } else {
+                                            break;
+                                        }
+                                    },
+                                    _request = request_op => {
+                                        // This will likely be a cancel request, but we don't care
+                                        // about the content. The signal is enough to know we need
+                                        // to move on.
                                         break;
                                     }
-                                } else {
-                                    break;
                                 }
-                                //     }
-                                // }
-                                // Err(err) => {
-                                //     error!("Error sending request: {:?}", err);
-                                //     if let Err(err) = req.resp.send(Response::Failure).await {
-                                //         error!("Error replying to request {:?}", err);
-                                //     }
-                                // }
                             }
                         }
                         Err(_) => {
@@ -76,6 +77,9 @@ pub fn web_request_handler(mut receiver: Receiver<Request>) {
                             }
                         }
                     };
+                }
+                Some(Cancel) => {
+                    continue;
                 }
                 _ => {
                     break;

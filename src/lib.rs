@@ -45,6 +45,12 @@ pub struct Request {
 }
 
 #[derive(Debug)]
+pub enum WebRequest {
+    Request(Request),
+    Cancel,
+}
+
+#[derive(Debug)]
 pub enum ScrollDirection {
     Up,
     Down,
